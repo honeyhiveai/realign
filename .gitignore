@@ -1,0 +1,12 @@
+dist/*
+*.env
+__pycache__
+.DS_Store
+dump.rdb
+tmp/
+agentsim.egg-info/
+venv/
+build/
+.pytest_cache/
+TODO.md
+lab

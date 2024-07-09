@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentsim"
+version = "0.0.2"
+dependencies = [
+    "litellm",
+    "jinja2",
+    "PyYAML",
+    "python-dotenv",
+    "pytest",
+    "pandas",
+]
+
+description = "AgentSim is a simulation based evaluation framework for multi-step agents."
+readme = "README.md"
+authors = [
+    {name = "HoneyHive", email = "support@honeyhive.ai"},
+]
+license = {text = "MIT License"}
+requires-python = ">= 3.8"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+
+[project.optional-dependencies]
+dev = ["pylint==2.16.2"]
+
+[project.urls]
+Documentation = "https://docs.honeyhive.ai/"
+
+[tool.setuptools.packages.find]
+where = ["src"]
