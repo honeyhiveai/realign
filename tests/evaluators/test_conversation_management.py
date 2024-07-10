@@ -59,7 +59,20 @@ def test_conversation_management():
         [{'role': 'user', 'content': 'What is the capital of France?'}, {'role': 'assistant', 'content': 'I don\'t know, but do you like pizza?'}],
         [{'role': 'user', 'content': 'Tell me about the history of Rome.'}, {'role': 'assistant', 'content': 'Let\'s talk about something else.'}],
         [{'role': 'user', 'content': 'Can you help me with my homework?'}, {'role': 'assistant', 'content': 'I\'d rather not.'}],
-        [{'role': 'user', 'content': 'What is 2+2?'}, {'role': 'assistant', 'content': 'Why do you want to know?'}]
+        [{'role': 'user', 'content': 'What is 2+2?'}, {'role': 'assistant', 'content': 'Why do you want to know?'}],
+        # Multi-turn adversarial test cases
+        [
+            {'role': 'user', 'content': 'Can you tell me about the weather?'},
+            {'role': 'assistant', 'content': 'Sure, let me tell you a joke first.'},
+            {'role': 'user', 'content': 'I asked about the weather.'},
+            {'role': 'assistant', 'content': 'Why do you want to know?'}
+        ],
+        [
+            {'role': 'user', 'content': 'What is the capital of France?'},
+            {'role': 'assistant', 'content': 'I don\'t know, but do you like pizza?'},
+            {'role': 'user', 'content': 'I asked about the capital of France.'},
+            {'role': 'assistant', 'content': 'Let\'s talk about something else.'}
+        ]
     ]
     for state in adversarial_states:
         score, result = conversation_management(state).unpack() # unpack the Evaluation object into score and result
@@ -71,7 +84,20 @@ def test_conversation_management():
         [{'role': 'user', 'content': 'What is the capital of France?'}, {'role': 'assistant', 'content': 'The capital of France is Paris.'}],
         [{'role': 'user', 'content': 'Tell me about the history of Rome.'}, {'role': 'assistant', 'content': 'Rome was founded in 753 BC and has a rich history.'}],
         [{'role': 'user', 'content': 'Can you help me with my homework?'}, {'role': 'assistant', 'content': 'Of course, what subject do you need help with?'}],
-        [{'role': 'user', 'content': 'What is 2+2?'}, {'role': 'assistant', 'content': '2+2 is 4.'}]
+        [{'role': 'user', 'content': 'What is 2+2?'}, {'role': 'assistant', 'content': '2+2 is 4.'}],
+        # Multi-turn robustness test cases
+        [
+            {'role': 'user', 'content': 'Can you tell me about the weather?'},
+            {'role': 'assistant', 'content': 'Sure, the weather today is sunny with a high of 75 degrees.'},
+            {'role': 'user', 'content': 'Thank you. What about tomorrow?'},
+            {'role': 'assistant', 'content': 'Tomorrow is expected to be cloudy with a chance of rain.'}
+        ],
+        [
+            {'role': 'user', 'content': 'What is the capital of France?'},
+            {'role': 'assistant', 'content': 'The capital of France is Paris.'},
+            {'role': 'user', 'content': 'Can you tell me more about Paris?'},
+            {'role': 'assistant', 'content': 'Paris is known for its art, fashion, and culture.'}
+        ]
     ]
     for state in robust_states:
         score, result = conversation_management(state).unpack() # unpack the Evaluation object into score and result
