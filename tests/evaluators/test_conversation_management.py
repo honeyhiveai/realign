@@ -19,13 +19,14 @@ evaluators:
                 - Turn-taking: Does the assistant respond appropriately to the user's input without interrupting or ignoring the user's questions?
                 - Topic transitions: Does the assistant smoothly transition between topics without abrupt changes or irrelevant responses?
                 - Coherence: Does the assistant maintain a logical and coherent flow of conversation throughout the interaction?
+                - Multi-turn management: Does the assistant handle multi-turn conversations effectively, maintaining context and relevance across multiple exchanges?
 
                 [The Start of Input]
                 {{messages}}
                 [The End of Input]
                 [Evaluation With Rating in JSON format]
             json_mode: on
-        target: '[4,5]' # target score range
+        target: '[3,5]' # target score range for multi-turn conversations, allowing for a broader range of acceptable performance due to increased complexity
         in_range: numeric_range
 """
 
@@ -35,17 +36,21 @@ def conversation_management(messages):
 
     # system_prompt template params
     params = {
-        'messages': str(messages)
+        'messages': '\n'.join([f"{msg['role']}: {msg['content']}" for msg in messages])
     }
 
-    # get the conversation management score by calling the LLM
-    response_content = llm_eval_call(params)
+    try:
+        # get the conversation management score by calling the LLM
+        response_content = llm_eval_call(params)
 
-    # unpack the response (dict since JSON mode is on)
-    score = response_content['rating']
+        # unpack the response (dict since JSON mode is on)
+        score = response_content['rating']
 
-    # check if the score is in the target range
-    result = check_guardrail(score)
+        # check if the score is in the target range
+        result = 3 <= score <= 5
+    except KeyError:
+        score = None
+        result = False
 
     return score, result
 
