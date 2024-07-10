@@ -1,5 +1,5 @@
 1 [x]	Response Format Following	Check if the AI adheres to the specified response format or structure
-2 []	Tone Adherence	Check if the AI maintains the requested tone throughout the response
+2 [x]	Tone Adherence	Check if the AI maintains the requested tone throughout the response
 3 []	Example Emulation	Check if the AI effectively emulates or applies the given example
 4 []	Prompt Clarification Handling	Check if the AI appropriately seeks or provides clarification when needed
 5 []	Process Description	Check if the AI effectively describes its reasoning or decision-making process
