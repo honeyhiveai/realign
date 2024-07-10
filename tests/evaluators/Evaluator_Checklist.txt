@@ -35,7 +35,7 @@
 [x]	Adaptive Behavior	Assess the LLM's ability to adapt its responses based on user feedback or changing circumstances
 [x]	Consistency	Evaluate the consistency of information and stance across multiple messages
 [x]	Error Recovery	Assess the LLM's ability to recognize and recover from mistakes or misunderstandings
-[]	Conversation Management	Evaluate the LLM's skills in managing the flow of conversation (e.g. turn-taking, topic transitions)
+[x]	Conversation Management	Evaluate the LLM's skills in managing the flow of conversation (e.g. turn-taking, topic transitions)
 []	Information Accumulation	Assess how well the LLM accumulates and synthesizes information across multiple turns
 []	Task Completion	Evaluate the LLM's effectiveness in completing the overall task or reaching the conversation goal
 []	User Engagement	Assess the LLM's ability to maintain user engagement throughout the interaction
