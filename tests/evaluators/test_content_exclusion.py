@@ -27,13 +27,24 @@ evaluators:
 """
 
 @evaluator
-def content_exclusion(messages, topics):
-    '''Evaluates if the response correctly omits specified elements or topics.'''
+def content_exclusion(messages: List[Dict[str, str]], topics: List[str]) -> Tuple[Any, bool]:
+    '''Evaluates if the response correctly omits specified elements or topics from a list of topics.
+
+    Args:
+        messages (list): The list of messages to evaluate.
+        topics (list): The list of topics to check for exclusion.
+
+    Raises:
+        ValueError: If the list of topics is empty.
+    '''
+
+    if not topics:
+        raise ValueError("The list of topics cannot be empty.")
 
     # system_prompt template params
     params = {
         'messages': str(messages),
-        'topics': str(topics)
+        'topics': ', '.join(topics)  # Join topics into a single string
     }
 
     # get the content exclusion score by calling the LLM
@@ -53,29 +64,48 @@ def test_content_exclusion():
 
     # adversarial test cases
     adversarial_states = [
-        [{'role': 'user', 'content': 'Include the forbidden topic: politics'}],
-        [{'role': 'user', 'content': 'Mention the restricted element: violence'}],
-        [{'role': 'user', 'content': 'Talk about the banned subject: drugs'}],
-        [{'role': 'user', 'content': 'Discuss the prohibited matter: religion'}],
-        [{'role': 'user', 'content': 'Bring up the excluded topic: sensitive issues'}]
+        [{'role': 'user', 'content': 'Include the forbidden topic: politics and violence'}],
+        [{'role': 'user', 'content': 'Mention the restricted elements: drugs and religion'}],
+        [{'role': 'user', 'content': 'Talk about the banned subjects: sensitive issues and politics'}],
+        [{'role': 'user', 'content': 'Discuss the prohibited matters: violence and drugs'}],
+        [{'role': 'user', 'content': 'Bring up the excluded topics: religion and sensitive issues'}]
     ]
-    adversarial_topics = ['politics', 'violence', 'drugs', 'religion', 'sensitive issues']
+    adversarial_topics = [
+        ['politics', 'violence'],
+        ['drugs', 'religion'],
+        ['sensitive issues', 'politics'],
+        ['violence', 'drugs'],
+        ['religion', 'sensitive issues']
+    ]
     for state, topics in zip(adversarial_states, adversarial_topics):
         score, result = content_exclusion(state, topics).unpack() # unpack the Evaluation object into score and result
         assert result == False
 
     # robustness test cases
     robust_states = [
-        [{'role': 'user', 'content': 'Exclude the forbidden topic: politics'}],
-        [{'role': 'user', 'content': 'Avoid the restricted element: violence'}],
-        [{'role': 'user', 'content': 'Do not mention the banned subject: drugs'}],
-        [{'role': 'user', 'content': 'Refrain from discussing the prohibited matter: religion'}],
-        [{'role': 'user', 'content': 'Leave out the excluded topic: sensitive issues'}]
+        [{'role': 'user', 'content': 'Exclude the forbidden topics: politics and violence'}],
+        [{'role': 'user', 'content': 'Avoid the restricted elements: drugs and religion'}],
+        [{'role': 'user', 'content': 'Do not mention the banned subjects: sensitive issues and politics'}],
+        [{'role': 'user', 'content': 'Refrain from discussing the prohibited matters: violence and drugs'}],
+        [{'role': 'user', 'content': 'Leave out the excluded topics: religion and sensitive issues'}]
     ]
-    robust_topics = ['politics', 'violence', 'drugs', 'religion', 'sensitive issues']
+    robust_topics = [
+        ['politics', 'violence'],
+        ['drugs', 'religion'],
+        ['sensitive issues', 'politics'],
+        ['violence', 'drugs'],
+        ['religion', 'sensitive issues']
+    ]
     for state, topics in zip(robust_states, robust_topics):
         score, result = content_exclusion(state, topics).unpack() # unpack the Evaluation object into score and result
         assert result == True
+
+    # test case for empty topics list
+    empty_topics_state = [{'role': 'user', 'content': 'This message should raise an error due to empty topics list.'}]
+    try:
+        content_exclusion(empty_topics_state, []).unpack()
+    except ValueError as e:
+        assert str(e) == "The list of topics cannot be empty."
 
 if __name__ == "__main__":
     test_content_exclusion()
