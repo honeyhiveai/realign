@@ -15,7 +15,7 @@ evaluators:
                 Please act as an impartial judge and evaluate the quality of the output to the input displayed below. Your evaluation should be based on the mentioned criteria. Begin your evaluation by providing a short explanation on how the output performs relative to the input. Be as objective as possible. After providing your explanation, you must rate the response on a scale of 1 to 5 by strictly following this JSON format: '{"rating": rating}, for example: '{"rating": 2}.
                 [Criteria]
 
-                Evaluate the LLM's skills in managing the flow of conversation, including turn-taking and topic transitions.
+                Evaluate the LLM's skills in managing the flow of conversation, including turn-taking, topic transitions, and maintaining coherence.
 
                 [The Start of Input]
                 {{messages}}
@@ -60,7 +60,7 @@ def test_conversation_management():
     ]
     for state in adversarial_states:
         score, result = conversation_management(state).unpack() # unpack the Evaluation object into score and result
-        assert result == True
+        assert result == False
 
     # robustness test cases
     robust_states = [
@@ -72,7 +72,7 @@ def test_conversation_management():
     ]
     for state in robust_states:
         score, result = conversation_management(state).unpack() # unpack the Evaluation object into score and result
-        assert result == False
+        assert result == True
 
 if __name__ == "__main__":
     test_conversation_management()
