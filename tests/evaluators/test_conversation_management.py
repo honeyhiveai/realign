@@ -15,7 +15,10 @@ evaluators:
                 Please act as an impartial judge and evaluate the quality of the output to the input displayed below. Your evaluation should be based on the mentioned criteria. Begin your evaluation by providing a short explanation on how the output performs relative to the input. Be as objective as possible. After providing your explanation, you must rate the response on a scale of 1 to 5 by strictly following this JSON format: '{"rating": rating}, for example: '{"rating": 2}.
                 [Criteria]
 
-                Evaluate the LLM's skills in managing the flow of conversation, including turn-taking, topic transitions, and maintaining coherence.
+                Evaluate the LLM's skills in managing the flow of conversation, including turn-taking, topic transitions, and maintaining coherence. Specifically, consider the following:
+                - Turn-taking: Does the assistant respond appropriately to the user's input without interrupting or ignoring the user's questions?
+                - Topic transitions: Does the assistant smoothly transition between topics without abrupt changes or irrelevant responses?
+                - Coherence: Does the assistant maintain a logical and coherent flow of conversation throughout the interaction?
 
                 [The Start of Input]
                 {{messages}}
