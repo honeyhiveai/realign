@@ -27,7 +27,7 @@
 27 [x]	Error Handling	Assess the robustness of error handling in the AI-generated code
 28 [x]	Security Best Practices	Evaluate adherence to security best practices in the AI-generated code
 29 [x]	Documentation Quality	Assess the quality and completeness of code documentation or comments
-30 []	Code Reusability	Assess the modularity and reusability of the AI-generated code
+30 [x]	Code Reusability	Assess the modularity and reusability of the AI-generated code
 31 []	Performance Optimization	Evaluate the level of performance optimization in the AI-generated code
 32 []	Coherence	Assess the logical flow and coherence across multiple messages in the trajectory
 33 []	Goal Adherence	Evaluate how well the LLM maintains focus on the overall goal throughout the interaction
