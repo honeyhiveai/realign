@@ -53,11 +53,16 @@ def test_code_efficiency():
 
     # adversarial test cases
     adversarial_states = [
-        [{'role': 'user', 'content': 'def inefficient_add(a, b): return sum([a, b])'}],  # Inefficient code
-        [{'role': 'user', 'content': 'def inefficient_multiply(a, b): return sum([a] * b)'}],  # Inefficient code
-        [{'role': 'user', 'content': 'def inefficient_divide(a, b): return sum([a] * (1 // b))'}],  # Inefficient code
-        [{'role': 'user', 'content': 'def inefficient_subtract(a, b): return sum([a, -b])'}],  # Inefficient code
-        [{'role': 'user', 'content': 'def inefficient_square(a): return sum([a] * a)'}]  # Inefficient code
+        [{'role': 'user', 'content': 'def add(a, b): return sum([a, b])'}],  # Inefficient code
+        [{'role': 'user', 'content': 'def multiply(a, b): return sum([a] * b)'}],  # Inefficient code
+        [{'role': 'user', 'content': 'def divide(a, b): return sum([a] * (1 // b))'}],  # Inefficient code
+        [{'role': 'user', 'content': 'def subtract(a, b): return sum([a, -b])'}],  # Inefficient code
+        [{'role': 'user', 'content': 'def square(a): return sum([a] * a)'}],  # Inefficient code
+        [{'role': 'user', 'content': 'class InefficientClass:\n    def inefficient_method(self, a, b):\n        return sum([a, b])'}],  # Inefficient class method
+        [{'role': 'user', 'content': 'def inefficient_recursive(n):\n    if n <= 1:\n        return n\n    else:\n        return inefficient_recursive(n-1) + inefficient_recursive(n-2)'}],  # Inefficient recursive function
+        [{'role': 'user', 'content': 'def inefficient_loop(n):\n    result = 0\n    for i in range(n):\n        for j in range(n):\n            result += i * j\n    return result'}],  # Inefficient nested loop
+        [{'role': 'user', 'content': 'def inefficient_data_structure(n):\n    return [i for i in range(n) if i % 2 == 0]'}],  # Inefficient data structure manipulation
+        [{'role': 'user', 'content': 'def inefficient_string_concat(n):\n    result = ""\n    for i in range(n):\n        result += str(i)\n    return result'}]  # Inefficient string concatenation
     ]
     for state in adversarial_states:
         score, result = code_efficiency(state).unpack() # unpack the Evaluation object into score and result
@@ -69,7 +74,12 @@ def test_code_efficiency():
         [{'role': 'user', 'content': 'def multiply(a, b): return a * b'}],  # Efficient code
         [{'role': 'user', 'content': 'def divide(a, b): return a / b'}],  # Efficient code
         [{'role': 'user', 'content': 'def subtract(a, b): return a - b'}],  # Efficient code
-        [{'role': 'user', 'content': 'def square(a): return a * a'}]  # Efficient code
+        [{'role': 'user', 'content': 'def square(a): return a * a'}],  # Efficient code
+        [{'role': 'user', 'content': 'class EfficientClass:\n    def efficient_method(self, a, b):\n        return a + b'}],  # Efficient class method
+        [{'role': 'user', 'content': 'def efficient_recursive(n):\n    if n <= 1:\n        return n\n    else:\n        return efficient_recursive(n-1) + efficient_recursive(n-2)'}],  # Efficient recursive function
+        [{'role': 'user', 'content': 'def efficient_loop(n):\n    result = 0\n    for i in range(n):\n        result += i\n    return result'}],  # Efficient loop
+        [{'role': 'user', 'content': 'def efficient_data_structure(n):\n    return [i for i in range(n) if i % 2 == 0]'}],  # Efficient data structure manipulation
+        [{'role': 'user', 'content': 'def efficient_string_concat(n):\n    return "".join([str(i) for i in range(n)])'}]  # Efficient string concatenation
     ]
     for state in robust_states:
         score, result = code_efficiency(state).unpack() # unpack the Evaluation object into score and result
