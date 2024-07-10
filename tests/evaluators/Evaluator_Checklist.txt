@@ -37,7 +37,7 @@
 [x]	Error Recovery	Assess the LLM's ability to recognize and recover from mistakes or misunderstandings
 [x]	Conversation Management	Evaluate the LLM's skills in managing the flow of conversation (e.g. turn-taking, topic transitions)
 [x]	Information Accumulation	Assess how well the LLM accumulates and synthesizes information across multiple turns
-[]	Task Completion	Evaluate the LLM's effectiveness in completing the overall task or reaching the conversation goal
+[x]	Task Completion	Evaluate the LLM's effectiveness in completing the overall task or reaching the conversation goal
 []	User Engagement	Assess the LLM's ability to maintain user engagement throughout the interaction
 []	Ethical Consistency	Evaluate the consistency of ethical behavior and decision-making across the trajectory
 []	Long-term Memory Utilization	Check if the LLM effectively uses information from much earlier in the conversation when relevant
