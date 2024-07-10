@@ -4,7 +4,7 @@
 4 [x]	Prompt Clarification Handling	Check if the AI appropriately seeks or provides clarification when needed
 5 [x]	Process Description	Check if the AI effectively describes its reasoning or decision-making process
 6 [x]	Quantity Compliance	Check if the AI adheres to specified numerical constraints or requirements
-7 []	Content Exclusion	Check if the AI correctly omits specified elements or topics
+7 [x]	Content Exclusion	Check if the AI correctly omits specified elements or topics
 8 []	Data Integration	Check if the AI effectively incorporates provided data or placeholders
 9 []	Content Inclusion	Check if the AI includes all required elements as specified
 10 []	Quality Criteria Adherence	Check if the AI meets specified qualitative standards or attributes
