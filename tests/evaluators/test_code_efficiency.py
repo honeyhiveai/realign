@@ -14,7 +14,10 @@ evaluators:
                 Please act as an impartial judge and evaluate the efficiency of the code snippet provided below. Your evaluation should be based on the mentioned criteria. Begin your evaluation by providing a short explanation on how the code performs relative to the input. Be as objective as possible. After providing your explanation, you must rate the response on a scale of 1 to 5 by strictly following this JSON format: '{"rating": rating}, for example: '{"rating": 2}.
                 [Criteria]
 
-                Evaluate the efficiency of the given code snippet in terms of time and space complexity.
+                Evaluate the efficiency of the given code snippet in terms of time and space complexity. Consider the following criteria:
+                - Time Complexity: How does the code perform as the input size increases? Rate from 1 (very inefficient, e.g., O(n^2) or worse) to 5 (very efficient, e.g., O(log n) or better).
+                - Space Complexity: How much memory does the code use as the input size increases? Rate from 1 (very inefficient, e.g., uses excessive memory) to 5 (very efficient, e.g., uses minimal memory).
+                - Code Structure: Is the code well-structured and easy to understand? Rate from 1 (poorly structured, hard to understand) to 5 (well-structured, easy to understand).
 
                 [The Start of Input]
                 {{code_snippet}}
@@ -58,11 +61,11 @@ def test_code_efficiency():
         [{'role': 'user', 'content': 'def divide(a, b): return sum([a] * (1 // b))'}],  # Inefficient code
         [{'role': 'user', 'content': 'def subtract(a, b): return sum([a, -b])'}],  # Inefficient code
         [{'role': 'user', 'content': 'def square(a): return sum([a] * a)'}],  # Inefficient code
-        [{'role': 'user', 'content': 'class InefficientClass:\n    def inefficient_method(self, a, b):\n        return sum([a, b])'}],  # Inefficient class method
-        [{'role': 'user', 'content': 'def inefficient_recursive(n):\n    if n <= 1:\n        return n\n    else:\n        return inefficient_recursive(n-1) + inefficient_recursive(n-2)'}],  # Inefficient recursive function
-        [{'role': 'user', 'content': 'def inefficient_loop(n):\n    result = 0\n    for i in range(n):\n        for j in range(n):\n            result += i * j\n    return result'}],  # Inefficient nested loop
-        [{'role': 'user', 'content': 'def inefficient_data_structure(n):\n    return [i for i in range(n) if i % 2 == 0]'}],  # Inefficient data structure manipulation
-        [{'role': 'user', 'content': 'def inefficient_string_concat(n):\n    result = ""\n    for i in range(n):\n        result += str(i)\n    return result'}]  # Inefficient string concatenation
+        [{'role': 'user', 'content': 'class ExampleClass:\n    def method(self, a, b):\n        return sum([a, b])'}],  # Inefficient class method
+        [{'role': 'user', 'content': 'def recursive(n):\n    if n <= 1:\n        return n\n    else:\n        return recursive(n-1) + recursive(n-2)'}],  # Inefficient recursive function
+        [{'role': 'user', 'content': 'def nested_loop(n):\n    result = 0\n    for i in range(n):\n        for j in range(n):\n            result += i * j\n    return result'}],  # Inefficient nested loop
+        [{'role': 'user', 'content': 'def data_structure(n):\n    return [i for i in range(n) if i % 2 == 0]'}],  # Inefficient data structure manipulation
+        [{'role': 'user', 'content': 'def string_concat(n):\n    result = ""\n    for i in range(n):\n        result += str(i)\n    return result'}]  # Inefficient string concatenation
     ]
     for state in adversarial_states:
         score, result = code_efficiency(state).unpack() # unpack the Evaluation object into score and result
@@ -75,11 +78,11 @@ def test_code_efficiency():
         [{'role': 'user', 'content': 'def divide(a, b): return a / b'}],  # Efficient code
         [{'role': 'user', 'content': 'def subtract(a, b): return a - b'}],  # Efficient code
         [{'role': 'user', 'content': 'def square(a): return a * a'}],  # Efficient code
-        [{'role': 'user', 'content': 'class EfficientClass:\n    def efficient_method(self, a, b):\n        return a + b'}],  # Efficient class method
-        [{'role': 'user', 'content': 'def efficient_recursive(n):\n    if n <= 1:\n        return n\n    else:\n        return efficient_recursive(n-1) + efficient_recursive(n-2)'}],  # Efficient recursive function
-        [{'role': 'user', 'content': 'def efficient_loop(n):\n    result = 0\n    for i in range(n):\n        result += i\n    return result'}],  # Efficient loop
-        [{'role': 'user', 'content': 'def efficient_data_structure(n):\n    return [i for i in range(n) if i % 2 == 0]'}],  # Efficient data structure manipulation
-        [{'role': 'user', 'content': 'def efficient_string_concat(n):\n    return "".join([str(i) for i in range(n)])'}]  # Efficient string concatenation
+        [{'role': 'user', 'content': 'class ExampleClass:\n    def method(self, a, b):\n        return a + b'}],  # Efficient class method
+        [{'role': 'user', 'content': 'def recursive(n):\n    if n <= 1:\n        return n\n    else:\n        return recursive(n-1) + recursive(n-2)'}],  # Efficient recursive function
+        [{'role': 'user', 'content': 'def nested_loop(n):\n    result = 0\n    for i in range(n):\n        result += i\n    return result'}],  # Efficient loop
+        [{'role': 'user', 'content': 'def data_structure(n):\n    return [i for i in range(n) if i % 2 == 0]'}],  # Efficient data structure manipulation
+        [{'role': 'user', 'content': 'def string_concat(n):\n    return "".join([str(i) for i in range(n)])'}]  # Efficient string concatenation
     ]
     for state in robust_states:
         score, result = code_efficiency(state).unpack() # unpack the Evaluation object into score and result
