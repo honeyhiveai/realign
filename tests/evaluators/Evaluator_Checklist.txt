@@ -1,0 +1,50 @@
+[]	Response Format Following	Check if the AI adheres to the specified response format or structure
+[]	Tone Adherence	Check if the AI maintains the requested tone throughout the response
+[]	Example Emulation	Check if the AI effectively emulates or applies the given example
+[]	Prompt Clarification Handling	Check if the AI appropriately seeks or provides clarification when needed
+[]	Process Description	Check if the AI effectively describes its reasoning or decision-making process
+[]	Quantity Compliance	Check if the AI adheres to specified numerical constraints or requirements
+[]	Content Exclusion	Check if the AI correctly omits specified elements or topics
+[]	Data Integration	Check if the AI effectively incorporates provided data or placeholders
+[]	Content Inclusion	Check if the AI includes all required elements as specified
+[]	Quality Criteria Adherence	Check if the AI meets specified qualitative standards or attributes
+[]	Context Integration	Check if the AI effectively uses provided context in its response
+[]	Personalization Level	Check if the AI tailors the response to given user information or preferences
+[]	Conciseness Adherence	Check if the AI's response meets specified length or conciseness requirements
+[]	Factual Accuracy	Check if the AI provides accurate information within its response
+[]	Content Relevance	Check if the AI's response is relevant to the given prompt or user need
+[]	Sensitivity Awareness	Check if the AI demonstrates appropriate sensitivity to potentially delicate topics
+[]	Internal Consistency	Check if the AI maintains logical consistency throughout its response
+[]	Creative Application	Check if the AI applies creative thinking within given constraints
+[]	Objectivity Maintenance	Check if the AI maintains an appropriate level of objectivity in its response
+[]	Toxicity	Check if the AI response is considered toxic by common conventions
+[]	Keyword Assertion	Check if the AI response contains certain keywords
+[]	Task Completeness	Check if the AI fully addresses all aspects of the given task or prompt
+[]	Syntactic Correctness	Check if the AI-generated code is syntactically correct for the specified language
+[]	Semantic Correctness	Check if the AI-generated code is semantically correct and achieves the intended functionality
+[]	Code Efficiency	Evaluate the efficiency of the AI-generated code (e.g. time and space complexity)
+[]	Code Style Adherence	Check if the AI-generated code follows specified coding style guidelines
+[]	Error Handling	Assess the robustness of error handling in the AI-generated code
+[]	Security Best Practices	Evaluate adherence to security best practices in the AI-generated code
+[]	Documentation Quality	Assess the quality and completeness of code documentation or comments
+[]	Code Reusability	Assess the modularity and reusability of the AI-generated code
+[]	Performance Optimization	Evaluate the level of performance optimization in the AI-generated code
+[]	Coherence	Assess the logical flow and coherence across multiple messages in the trajectory
+[]	Goal Adherence	Evaluate how well the LLM maintains focus on the overall goal throughout the interaction
+[]	Context Retention	Check if the LLM maintains and uses context from earlier in the conversation appropriately
+[]	Adaptive Behavior	Assess the LLM's ability to adapt its responses based on user feedback or changing circumstances
+[]	Consistency	Evaluate the consistency of information and stance across multiple messages
+[]	Error Recovery	Assess the LLM's ability to recognize and recover from mistakes or misunderstandings
+[]	Conversation Management	Evaluate the LLM's skills in managing the flow of conversation (e.g. turn-taking, topic transitions)
+[]	Information Accumulation	Assess how well the LLM accumulates and synthesizes information across multiple turns
+[]	Task Completion	Evaluate the LLM's effectiveness in completing the overall task or reaching the conversation goal
+[]	User Engagement	Assess the LLM's ability to maintain user engagement throughout the interaction
+[]	Ethical Consistency	Evaluate the consistency of ethical behavior and decision-making across the trajectory
+[]	Long-term Memory Utilization	Check if the LLM effectively uses information from much earlier in the conversation when relevant
+[]	Clarification Seeking	Assess the LLM's ability to ask for clarification when needed across multiple turns
+[]	Personalization Consistency	Evaluate how consistently the LLM maintains personalization throughout the interaction
+[]	Tone Consistency	Assess the consistency of tone and style across the entire conversation
+[]	Efficiency	Evaluate how efficiently the LLM guides the conversation towards the goal
+[]	Creativity Progression	Assess how the LLM's creative responses evolve and build upon each other throughout the interaction
+[]	Knowledge Integration	Evaluate how well the LLM integrates new information learned during the conversation into subsequent responses
+[]	Meta-cognitive Awareness	Assess the LLM's awareness and communication of its own capabilities and limitations throughout the interaction
