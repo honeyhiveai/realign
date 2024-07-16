@@ -1,4 +1,4 @@
-from agentsim.evaluators.targets.BaseTarget import BaseTarget
+from agentsim.targets.BaseTarget import BaseTarget
 
 class StringTarget(BaseTarget):
     

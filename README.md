@@ -33,8 +33,6 @@ For the novice, we offer customization in Evaluators, App Settings, and Trajecto
 For the expert, we allow developers to build their own console and simulation logic.
 
 
-
-
 ## Quickstart
 
 

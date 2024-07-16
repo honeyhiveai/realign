@@ -1,39 +1,35 @@
 from agentsim import Simulator
-from agentsim.evaluators import message_limit, toxicity_score_llm
+from agentsim.evaluators import message_limit, toxicity_score_llm, check_introduction_assessment, router, check_concept_explanation
 from agentsim.utils import print_system_prompt, print_chat, evaluations_dataframe
-
-from tests.is_professional_style import is_professional_style
-
 from dotenv import load_dotenv
+
 
 def main():
     load_dotenv()
 
     sim = Simulator('tests/config.yaml')
-    print_system_prompt(sim)
-    
-    evaluations = []
+    print_system_prompt(sim, app_agents=['intro_assessment', 'concept_explanation', 'problem_solving'])
     
     messages = []
-    while (eval_0 := message_limit(messages)).result: # 0: score, 1: result
+    state = 'intro_assessment'
+    while (msg_limit := message_limit(messages)).score < 3: # 0: score, 1: result
+        if state == 'intro_assessment':
+            if (intro_check := check_introduction_assessment(messages)).result:
+                state = router(messages)
+            else:
+                sim.sim_agent.process_turn(messages)
+                sim.app_agents['intro_assessment'].process_turn(messages)
+
+        if state == 'concept_explanation':
+            if (concept_check := check_concept_explanation(messages)).result:
+                state = router(messages)
+            else:
+                sim.sim_agent.process_turn(messages)
+                sim.app_agents['concept_explanation'].process_turn(messages)
         
-        # add a new row to the dataframe
-        evaluations.append(eval_0)
-        
-        sim.sim_agent.process_turn(messages)
-        sim.app_agent.process_turn(messages)
+        if state == 'problem_solving': break
 
-        eval_1 = is_professional_style(messages)
-        evaluations.append(eval_1)
-
-        if eval_1.result == False:
-            raise Exception('Professionalism score is below threshold')
-
-        print('toxicity', (eval_2 := toxicity_score_llm(messages[-2:])))
-        evaluations.append(eval_2)
-    
     print_chat(messages)
-    print(evaluations_dataframe(evaluations).head())
 
 if __name__ == '__main__':
     main()

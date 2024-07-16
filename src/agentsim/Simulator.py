@@ -2,12 +2,13 @@ import yaml
 from typing import Any, Optional
 import importlib
 import os
-from jinja2 import Template
 from dotenv import load_dotenv
 
-from agentsim import AbstractAgent
-from agentsim.types import *
+from agentsim.types.types import *
 
+from litellm import completion  
+from agentsim.types.types import AgentConfig
+from agentsim.utils import resolve_system_prompt
 
 class ModuleLoader:
     @staticmethod
@@ -35,11 +36,13 @@ class Simulator:
         self.str_yaml = str_yaml
         self.raw_config: dict[str, Any] = {}
         self.agentsim_config: Optional[AgentSimConfig] = None
+
         self.config_only: bool = config_only
         
         # app and sim agents
-        self.app_agent: AbstractAgent = {}
         self.sim_agent: AbstractAgent = {}
+        self.app_agent: AbstractAgent = {}
+        self.evaluators: dict[str, callable] = {}
         
         # Initialize the simulator
         self.initialize()
@@ -49,69 +52,34 @@ class Simulator:
         agent_class = ModuleLoader.load_class('agents', agent_config.architecture)
         return agent_class(agent_config)
 
-    def load_yaml(self):
-        if self.yaml_file is not None:
-            with open(self.yaml_file, 'r') as file:
-                self.raw_config = yaml.safe_load(file)
-        elif self.raw_yaml is not None:
-            self.raw_config = yaml.load(self.raw_yaml, Loader=yaml.FullLoader)
-        elif self.str_yaml is not None:
-            self.raw_config = yaml.safe_load(self.str_yaml)
-        else:
-            raise ValueError("No config yaml_file or raw_yaml must be provided")
 
-    def parse_model_settings(self, config: dict[str, Any]) -> ModelSettings:
-        return ModelSettings(
-            model=config.get('model', ''),
-            api_key=config.get('api_key', ''),
-            hyperparams=config.get('hyperparams', {}),
-            system_prompt=config.get('system_prompt', ''),
-            json_mode=config.get('json_mode', False)
-        )
+            # load the templates
+            # if name == 'templates':
+                # load the yaml from evaluators/default_evaluators.yaml
+                # default_evaluators = {}
+                # try:
+                #     with open('evaluators/default_evaluators.yaml', 'r') as file:
+                #         default_evaluators = yaml.safe_load(file)
+                # except FileNotFoundError:
+                #     raise FileNotFoundError("Could not find default evaluators file. Please make sure it exists.")
 
-    def parse_agent_config(self, config: dict[str, Any]) -> AgentConfig:
+                # for config_template_eval, on_off in config.items():
+                #     if type(on_off) != bool:
+                #             raise ValueError(f"Template config must be a boolean values. Please use on or off, or True or False.")
+                #     if on_off:
+                #         retrieved_eval_config = default_evaluators.get(config_template_eval, None)
+                #         if retrieved_eval_config is None:
+                #             raise ValueError(f"Could not find template {config_template_eval}. Please make sure the evaluator is one of the defaults.")
+                        
+                #         # set the config to the retrieved config
+                #         config = retrieved_eval_config
+
+
         
-        # override the system prompt from the agent config if provided
-        model_settings = self.parse_model_settings(config.get('model_settings', {}))
-        system_prompt = model_settings.system_prompt
-        if config.get('system_prompt', '') != '':
-            system_prompt = config.get('system_prompt')
-
-        return AgentConfig(
-            architecture=config.get('architecture', ''),
-            model_settings=self.parse_model_settings(config.get('model_settings', {})),
-            state=config.get('state', ''),
-            system_prompt=system_prompt,
-            role=config.get('role', 'assistant')
-        )
-
-    def load_app_config(self) -> AppConfig:
-        app_config = self.raw_config.get('app', None)
-        if not app_config: 
-            return app_config
-
-        agent_config = self.parse_agent_config(app_config.get('agent', {}))
-        agent_config.role = 'assistant'
-
-        # Load simulation modules
-        if not self.config_only:
-            self.app_agent = Simulator.initialize_agent(agent_config)
-
-        return AppConfig(agent=agent_config)
-
-    def load_evaluators_config(self) -> dict[str, EvaluatorConfig]:
-        evaluators_config = self.raw_config.get('evaluators', {})
-        if not evaluators_config: 
-            return evaluators_config
-        parsed_evaluators = {}
-        
-        for name, config in evaluators_config.items():
-            config = config or {}
-            parsed_evaluators[name] = EvaluatorConfig(
-                model_settings=self.parse_model_settings(config.get('model_settings', {})),
-                target=config.get('target', None),
-                in_range=config.get('in_range', '')
-            )
+        # load the evaluators if not config only
+        # if not self.config_only:
+        #     for name, config in parsed_evaluators.items():
+        #         self.evaluators[name] = ModuleLoader.load_class('evaluators', name)
 
         return parsed_evaluators
 
@@ -135,39 +103,41 @@ class Simulator:
         # shuffle the personas and intents 
         if not self.config_only:
             if synth_user_settings.personas and synth_user_settings.scenarios:
-                import random
-                import json
-                from litellm import completion
+                # import random
+                # import json
+                # from litellm import completion
                 
-                if synth_user_settings.shuffle_seed:
-                    random.seed(synth_user_settings.shuffle_seed)
+                # if synth_user_settings.shuffle_seed:
+                #     random.seed(synth_user_settings.shuffle_seed)
                 
-                personas = list(synth_user_settings.personas.values())
-                scenarios = list(synth_user_settings.scenarios.values())
+                # personas = list(synth_user_settings.personas.values())
+                # scenarios = list(synth_user_settings.scenarios.values())
                 
-                persona = random.choice(personas)
-                scenario = random.choice(scenarios)
+                # persona = random.choice(personas)
+                # scenario = random.choice(scenarios)
                 
-                synth_user_gen_prompt_template = Template(synth_user_settings.model_settings.system_prompt)
-                response = completion(
-                    model=synth_user_settings.model_settings.model,
-                    api_key=os.getenv(synth_user_settings.model_settings.api_key),
-                    messages=[
-                        {
-                            'role': 'user', 
-                            'content': synth_user_gen_prompt_template.render({
-                                'persona': persona, 
-                                'scenario': scenario
-                            })
-                        },
-                    ],
-                    response_format={ 'type': "json_object" },
-                    **synth_user_settings.model_settings.hyperparams
-                )
-                synth_user_system_prompt = json.loads(response.choices[0].message['content'])['synth_user_system_prompt']
+                # synth_user_gen_prompt_template = Template(synth_user_settings.model_settings.system_prompt)
 
+                # response = completion(
+                #     model=synth_user_settings.model_settings.model,
+                #     api_key=os.getenv(synth_user_settings.model_settings.api_key),
+                #     messages=[
+                #         {
+                #             'role': 'user', 
+                #             'content': synth_user_gen_prompt_template.render({
+                #                 'persona': persona, 
+                #                 'scenario': scenario
+                #             })
+                #         },
+                #     ],
+                #     response_format={ 'type': "json_object" },
+                #     **synth_user_settings.model_settings.hyperparams
+                # )
+                # synth_user_system_prompt = json.loads(response.choices[0].message['content'])['synth_user_system_prompt']
+                
                 # set the system prompt for the synthetic user
-                agent_config.system_prompt = synth_user_system_prompt
+                # agent_config.system_prompt = synth_user_system_prompt
+                agent_config.system_prompt = synth_user_settings.model_settings.system_prompt
             else:
                 raise ValueError("Personas and scenarios must be provided in the simulations config")
 

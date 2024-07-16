@@ -1,10 +1,14 @@
-from agentsim.evaluators.targets import NumericRangeTarget, BaseTarget, ContainsTarget
+from agentsim.targets import NumericRangeTarget, BaseTarget, ContainsTarget
 from agentsim.Simulator import Simulator
-from agentsim.types import EvaluatorConfig
+# from agentsim.types.types import EvaluatorConfig, ModelSettings
+from agentsim import prompts
 from typing import Any
 import os
 import inspect
 from jinja2 import Template
+from litellm import completion
+import json
+    
 
 class bcolors:
     HEADER = '\033[95m'
@@ -17,12 +21,14 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
     
-def print_system_prompt(sim):
+def print_system_prompt(sim, app_agents=None):
     user_sys_prompt = sim.sim_agent.config.system_prompt
     print(bcolors.HEADER + '\nUSER SYSTEM PROMPT\n\n', user_sys_prompt, bcolors.ENDC)
     
-    app_sys_prompt = sim.app_agent.config.system_prompt
-    print(bcolors.HEADER + '\nAPP SYSTEM PROMPT\n\n', app_sys_prompt, bcolors.ENDC)
+    if app_agents:
+        for app_agent in app_agents:
+            app_sys_prompt = sim.app_agents[app_agent].config.system_prompt
+            print(bcolors.HEADER + '\nAPP SYSTEM PROMPT\n\n', app_sys_prompt, bcolors.ENDC)
 
 def print_chat(messages):
     for m in messages:
@@ -61,24 +67,67 @@ def check_guardrail(score: Any, eval_func=None) -> bool:
     
     # get the evaluator config
     eval_config = get_evaluator_config_from_env(eval_func)
+    
+    if not(eval_config.in_range and eval_config.target):
+        return None
 
     # set the callable target object
     evaluate_target = guardrail_evaluator(eval_config.in_range, eval_config.target)
 
     # run the evaluation
     result = evaluate_target(score)
-
+        
     return result
 
+def resolve_template(template_name: str):
+    if template_name == 'rating_5_star':
+        return prompts.rating_5_star
+    raise ValueError("Template not found")
 
-def llm_eval_call(template_params: dict[str, Any]) -> Any:
+def resolve_system_prompt(model_settings: ModelSettings) -> str:
+    prompt_to_render = ''
+    system_prompt = model_settings.system_prompt
+    template = model_settings.template
+    if template == '' and system_prompt == '':
+        raise ValueError("Either system_prompt or template must be provided in the model settings")
+
+    # use system prompt if it is provided
+    if system_prompt != '':
+        prompt_to_render = system_prompt
+    else:
+        prompt_to_render = resolve_template(template)
+    
+    jinja_template = Template(prompt_to_render)
+    prompt_params = model_settings.prompt_params
+    if prompt_params is None:
+        return jinja_template.render({})
+    elif type(prompt_params) != dict:
+        raise ValueError("Prompt params must be a dictionary")
+    elif not all([type(k) == str for k in prompt_params.keys()]):
+        raise ValueError("Prompt params keys must be strings")
+    
+    # ensure that values are all strings
+    for k, v in prompt_params.items():
+        if type(k) != str:
+            raise ValueError("Prompt params keys must be strings")
+        if type(v) != str:
+            prompt_params[k] = str(v)
+    
+    # try to render the template
+    try:
+        render = jinja_template.render(prompt_params)
+    except Exception as e:
+        raise ValueError(f"Error rendering system prompt: {e}")
+    
+    return render
+        
+
+def llm_eval_call(eval_func=None) -> Any:
     '''Evaluate using an LLM'''
-    
-    from litellm import completion
-    import json
-    
+
     # load the parent function that called this function
-    eval_func = inspect.stack()[1].function
+    if eval_func is None:
+        eval_func = inspect.stack()[1].function
     
     # get the evaluator config
     eval_config = get_evaluator_config_from_env(eval_func)
@@ -86,12 +135,12 @@ def llm_eval_call(template_params: dict[str, Any]) -> Any:
     # get the model settings
     model_settings = eval_config.model_settings
     
-    # make the completion call
-    eval_prompt_template = Template(model_settings.system_prompt)
-    eval_prompt = eval_prompt_template.render(template_params)
+    # resolve the prompt
+    eval_prompt = resolve_system_prompt(model_settings)
     
     # get the response
     response_format = { 'type': "json_object" } if model_settings.json_mode else None
+
     response = completion(
         model=model_settings.model,
         api_key=os.getenv(model_settings.api_key),
@@ -110,6 +159,22 @@ def llm_eval_call(template_params: dict[str, Any]) -> Any:
 
     return response.choices[0].message['content']
 
+
+def llm_rating_evaluator(messages, eval_func=None):
+    
+    # if no eval_func, load the parent function that called this function
+    if eval_func is None:
+        eval_func = inspect.stack()[1].function
+    
+    # get the toxicity score
+    score = llm_eval_call({
+        'messages': str(messages)
+    }, eval_func)['rating']
+    
+    # check if the score is in the target range
+    result = check_guardrail(score, eval_func)
+    
+    return score, result
 
 def text_format_messages(messages):
     '''Format messages for LLM evaluation'''

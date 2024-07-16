@@ -1,5 +1,5 @@
 from typing import Any, Union
-from agentsim.evaluators.targets.BaseTarget import BaseTarget
+from agentsim.targets.BaseTarget import BaseTarget
 
 class NumericRangeTarget(BaseTarget):
     '''Evaluator for checking if a numeric value is within a passing range'''

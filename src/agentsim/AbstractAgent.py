@@ -1,25 +1,21 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 from litellm import completion  
-from agentsim.types import AgentConfig
+from realign.types import AgentConfig
 import os
 
 class AbstractAgent(ABC):
     def __init__(self, config: AgentConfig):
         self.config: AgentConfig = config
 
-    def _generate_chat_completion(self, messages: Any) -> str:
-        
-        # check if messages are empty
-        if len(messages) == 0:
-            raise ValueError('Messages cannot be empty')
-        
+    def _generate_chat_completion(self, messages: list[dict[str, str]]) -> str:
+
         # swap roles for user
         if self.config.role == 'user':
             messages = AbstractAgent.swap_roles(messages)
         
         # set the system prompt assuming it is the first message
-        messages[0] = { 'role': 'system', 'content': self.config.system_prompt }
+        messages[0] = { 'role': 'system', 'content': resolve_system_prompt(self.config.model_settings) }
 
         # make the completion call
         response = completion(
@@ -29,7 +25,7 @@ class AbstractAgent(ABC):
             **self.config.model_settings.hyperparams
         )
         
-        # undo swap roles for user
+        # unswap roles for user
         if self.config.role == 'user':
             messages = AbstractAgent.swap_roles(messages)
 

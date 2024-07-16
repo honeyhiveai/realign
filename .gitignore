@@ -10,3 +10,4 @@ build/
 .pytest_cache/
 TODO.md
 lab
+**/cache/**
