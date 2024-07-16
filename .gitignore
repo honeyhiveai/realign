@@ -10,4 +10,3 @@ build/
 .pytest_cache/
 TODO.md
 lab
-**/persona-hub/**
