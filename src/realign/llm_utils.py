@@ -1,6 +1,5 @@
 from realign.types import ModelSettings, OpenAIMessage, RunData, resolve_prompt_template
 from realign.evaluation import evaluator
-from jinja2 import Template
 from typing import Any, Optional, Self, Generator
 from litellm import completion, acompletion
 import os
@@ -141,7 +140,8 @@ class SyntheticUserBuilder(AgentBuilder):
         self.persona = None
         self.scenario = None
         self.synth_user_builder_model_settings = ModelSettings(
-            model='openai/gpt-4o',
+            # model='openai/gpt-4o',
+            model='groq/llama3-8b-8192',
             role='user',
             template='synthetic_user_prompt_generator',
             prompt_params={},
@@ -170,30 +170,35 @@ class SyntheticUserBuilder(AgentBuilder):
         self.synth_user_builder_model_settings.prompt_params['app'] = app_objective
         return self
     
+    def with_system_prompt(self, system_prompt: str) -> 'SyntheticUserBuilder':
+        self.synth_user_system_prompt = system_prompt
+        return self
+    
     def build(self) -> SyntheticUserAgent:
         
-        if not self.persona:
-            raise ValueError("Persona must be set")
+        if not self.synth_user_system_prompt:
+            if not self.persona:
+                raise ValueError("Persona must be set")
+            
+            # get the next persona
+            next_persona = next(self.persona_generator)
         
-        # get the next persona
-        next_persona = next(self.persona_generator)
-    
-        # generate the synthetic user prompt
-        self.synth_user_builder_model_settings.prompt_params = {
-            **self.synth_user_builder_model_settings.prompt_params,
-            'scenario': self.scenario,
-            'persona': next_persona,
-        }
+            # generate the synthetic user prompt
+            self.synth_user_builder_model_settings.prompt_params = {
+                **self.synth_user_builder_model_settings.prompt_params,
+                'scenario': self.scenario,
+                'persona': next_persona,
+            }
 
-        prompt_renderer_agent = ChatAgent(model_settings=self.synth_user_builder_model_settings)
-        messages: list[OpenAIMessage] = prompt_renderer_agent.process_turn()
-        if len(messages) == 0:
-            raise ValueError("No messages generated")
-        generated_prompt = messages[-1].content['synth_user_system_prompt']
+            prompt_renderer_agent = ChatAgent(model_settings=self.synth_user_builder_model_settings)
+            messages: list[OpenAIMessage] = prompt_renderer_agent.process_turn()
+            if len(messages) == 0:
+                raise ValueError("No messages generated")
+            self.synth_user_system_prompt = messages[-1].content['synth_user_system_prompt']
 
         # initialize the synthetic user agent with the generated prompt
         synthetic_user_agent = SyntheticUserAgent()
-        synthetic_user_agent.model_settings.system_prompt = generated_prompt
+        synthetic_user_agent.model_settings.system_prompt = self.synth_user_system_prompt
 
         return synthetic_user_agent
 
@@ -251,10 +256,6 @@ class SyntheticUserBuilder(AgentBuilder):
         for r in response:
             personas.append(r.text)
         return personas
-
-
-
-
 
 class bcolors:
     HEADER = '\033[95m'
@@ -634,10 +635,22 @@ class ChatSimulation(Simulation):
 # unit test
 if __name__ == '__main__':
     
+    import numpy as np
+    
     @evaluator
-    def length_evaluator(messages):
-        print('Length evaluator', len(messages))
-        return len(messages), True
+    def aggregate_length(messages):
+
+        def length_evaluator(messages):
+            print('Length evaluator', len(messages))
+            return len(messages), True
+        
+        evaluations = [length_evaluator(messages) for _ in range(3)]
+        
+        # unzip into scores and results
+        scores, results = zip(*evaluations)
+
+        return np.mean(scores), all(results)
+        
     
     @evaluator(repeat=3)
     async def llm_debate_winner(messages):
@@ -669,9 +682,10 @@ if __name__ == '__main__':
     
     
     # build a synthetic user
-    synth_user_builder = SyntheticUserBuilder().as_a('artistic chef').they_want_to('improve their money management skills')
+    # synth_user_builder = SyntheticUserBuilder().as_a('photographer').they_want_to('learn technical aspects of photography')
+    synth_user_builder = SyntheticUserBuilder().with_system_prompt('Be a good student and ask questions')
     
-    simulation = ChatSimulation(runs=5, max_messages=5)
+    simulation = ChatSimulation(runs=1, max_messages=5)
 
     simulation.app = ChatAgent(system_prompt='''
 As an AI tutor, your role is to guide student learning across various subjects through explanations and questions. Assess student knowledge and adapt your approach accordingly, providing clear explanations with simple terms and examples. Encourage critical thinking, offer step-by-step problem-solving guidance, and give constructive feedback. Be flexible in addressing different learning styles while maintaining a friendly, encouraging tone. Focus on academic subjects, promote understanding over mere answer-giving, and admit knowledge limitations when necessary. Ensure safe, appropriate interactions and tailor your language to the student's age and level. Your goal is to support learning without replacing human teachers or doing the student's work for them.
@@ -679,6 +693,8 @@ As an AI tutor, your role is to guide student learning across various subjects t
         model='groq/llama3-8b-8192', role='assistant')
     
     simulation.simulator = synth_user_builder
+    
+    simulation.evaluators = [aggregate_length]
 
     # simulation.dataset = ChatDataset('src/realign/data.json')
     # print(simulation.dataset.data)
@@ -692,6 +708,8 @@ As an AI tutor, your role is to guide student learning across various subjects t
     # simulation.evaluators = [length_evaluator, user_role_counter]
 
     simulation.run()
+    
+    # publish run and eval results
     simulation.push_runs_to_dataset('src/realign/run_data.json')
     simulation.push_evals_dataset('src/realign/eval_data.json')
     

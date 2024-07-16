@@ -34,7 +34,7 @@ class Evaluation(object):
         return self.__dict__()
 
 # evaluator decorator to wrap an app scorer inside a Evaluation object
-def evaluator(eval_func=None, *, repeat=1):
+def evaluator(eval_func=None, *, repeat=1) -> Evaluation:
     def decorator(func):
         @wraps(eval_func)
         async def wrapper(run_data: RunData, *args, **kwargs):
@@ -55,17 +55,35 @@ def evaluator(eval_func=None, *, repeat=1):
                 # unpack results
                 score, result = response
                 return (score, result)
+            
+            assert repeat >= 0, 'Repeat must be greater than 0'
+            
+            if repeat == 0:
+                return None
 
             if repeat > 1:
                 tasks = [single_run() for _ in range(repeat)]
                 score_result_tuples = await asyncio.gather(*tasks)
                 scores, results = zip(*score_result_tuples)
 
-                # we return the full array of scores and whether all results passed
-                return Evaluation(scores, all(results), run_data, func.__name__, repeat)
+                # for repeats, return the full array of scores and results
+                return Evaluation(
+                    scores,
+                    results,
+                    run_data,
+                    func.__name__,
+                    repeat
+                )
             else:
+                # for single runs, return a single score and result
                 score, result = await single_run()
-                return Evaluation(score, result, run_data, func.__name__)
+                return Evaluation(
+                    score,
+                    result,
+                    run_data,
+                    func.__name__,
+                    repeat
+                )
 
         return wrapper
 
