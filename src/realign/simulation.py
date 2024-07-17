@@ -22,6 +22,7 @@ class Simulation:
         self.dataset: Dataset = None
         self.app: AbstractAgent = None
         self.simulator: AgentBuilder = None
+        self.evaluators: list[callable] = []
 
         # results
         self.run_data: dict[int, RunData] = dict()
@@ -88,12 +89,7 @@ class Simulation:
         for run_id, evals in self.eval_results.items():
             data_obj['run_data_hash'].append(self.run_data[run_id].compute_hash())
             for evaluation_obj in evals:
-                data_obj['evaluations'].append({
-                    evaluation_obj.eval_name: {
-                        'score': evaluation_obj.score,
-                        'result': evaluation_obj.result
-                    }
-                })
+                data_obj['evaluations'].append(evaluation_obj.to_dict())
         return data_obj
     
     def push_runs_to_dataset(self, dataset_path: str) -> None:
@@ -164,7 +160,7 @@ class ChatSimulation(Simulation):
         # simulation components
         self.dataset: ChatDataset = None
         self.app: ChatAgent = None
-        self.simulator: SyntheticUserBuilder = None        
+        self.simulator: SyntheticUserBuilder = None   
         
         self.max_messages = max_messages
         self.first_turn_role = 'user'

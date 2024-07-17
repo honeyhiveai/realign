@@ -1,8 +1,9 @@
 from realign.types import OpenAIMessage
+import json
 
 class Dataset:
     # TODO: async for to validate and load large datasets
-    
+
     @staticmethod
     def validate_data_format(data) -> bool:
         if not data:

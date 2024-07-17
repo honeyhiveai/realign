@@ -125,3 +125,6 @@ async def allm_messages_call(model_settings: ModelSettings, messages: list[OpenA
     
     return message
 
+def messages_to_string(messages: list[OpenAIMessage]) -> str:
+    '''Convert a list of messages to a string'''
+    return '\n'.join([m.role + ':\n' + m.content for m in messages])

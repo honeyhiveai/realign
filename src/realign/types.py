@@ -66,6 +66,18 @@ class ModelSettings:
             raise ValueError(f"Error rendering system prompt: {e}")
         
         return render
+    
+    def copy(self):
+        return ModelSettings(
+            model=self.model,
+            api_key=self.api_key,
+            hyperparams=self.hyperparams,
+            prompt_params=self.prompt_params,
+            template=self.template,
+            system_prompt=self.system_prompt,
+            json_mode=self.json_mode,
+            role=self.role
+        )
 
 @dataclass
 class AgentConfig:
@@ -97,13 +109,6 @@ class SimulationTestConfig:
 class SimulationConfig:
     agent: AgentConfig
     tests: SimulationTestConfig
-
-@dataclass
-class AgentSimConfig:
-    app: AppConfig
-    evaluators: dict[str, EvaluatorConfig]
-    robustness_simulations: SimulationConfig
-    adversarial_simulations: SimulationConfig
 
 @dataclass
 class OpenAIMessage:
