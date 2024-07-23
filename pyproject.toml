@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "realign"
-version = "0.1.21"
+version = "0.1.24"
 dependencies = [
     "litellm",
     "jinja2",

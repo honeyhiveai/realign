@@ -26,5 +26,5 @@ simulation.evaluators = [allm_toxicity_rating, allm_user_engagement]
 simulation.run()
 
 # publish simulation run and eval results
-simulation.push_runs_to_dataset('src/realign/data/run_data.json')
-simulation.push_evals_dataset('src/realign/data/eval_data.json')
+simulation.push_runs_to_dataset('data/run_data.json')
+simulation.push_evals_dataset('data/eval_data.json')

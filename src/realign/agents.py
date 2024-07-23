@@ -221,19 +221,19 @@ class SyntheticUserBuilder(AgentBuilder):
         except ImportError:
             raise ImportError("llama_index not installed")
         
-        persist_dir = "src/realign/persona-hub/cache"
+        persist_dir = os.path.join(os.path.dirname(__file__), "persona-hub/cache")
+        personas_path = os.path.join(os.path.dirname(__file__), "persona-hub/persona.jsonl")
         
         # use a smaller model for faster embeddings
-        # reduce the dimensions to 1024
+        # reduce the dimensions to 512
         Settings.embed_model = OpenAIEmbedding(
-            model="text-embedding-3-small", dimensions=256
+            model="text-embedding-3-small", dimensions=512
         )
         
         # check if directory exists
         if not os.path.exists(persist_dir):
-
             documents = []
-            with open('src/realign/persona-hub/persona.jsonl') as f:
+            with open(personas_path) as f:
                 for line in f:
                     documents.append(Document(text=json.loads(line.strip())['persona']))
                     if len(documents) % 100 == 0:
