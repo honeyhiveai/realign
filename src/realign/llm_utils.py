@@ -1,8 +1,10 @@
-from realign.types import ModelSettings, OpenAIMessage
+from realign.types import ModelSettings, OpenAIMessage, EvalResult, RunData
 from typing import Any
-from litellm import completion, acompletion
+from litellm import completion, acompletion, aembedding
 import os
 import json
+import asyncio
+from functools import wraps
 
 
 class bcolors:
@@ -44,10 +46,14 @@ def swap_roles(messages: list[dict[str, str]]) -> list[dict[str, str]]:
             message.role = 'user'
     return messages
 
-def llm_call_get_completion_params(model_settings: ModelSettings, messages: list[OpenAIMessage]) -> dict:
+def llm_call_get_completion_params(model_settings: ModelSettings, 
+                                   messages: list[OpenAIMessage], 
+                                   use_input_template=False) -> dict:
         
     # resolve the prompt
-    system_prompt = model_settings.resolve_system_prompt()
+    system_prompt = model_settings.resolve_system_prompt(use_input_template)
+    
+    print('SYSTEM PROMPT:', system_prompt)
     
     # insert the system prompt
     if len(messages) == 0:
@@ -82,8 +88,24 @@ def llm_call_get_completion_params(model_settings: ModelSettings, messages: list
         'response_format': response_format,
         **hyperparams,
     }
+
+def parse_json_content(content):
+    try:
+        # First, try to parse it as proper JSON
+        return json.loads(content)
+    except json.JSONDecodeError:
+        try:
+            import ast
+            # If that fails, try to evaluate it as a Python literal
+            parsed = ast.literal_eval(content)
+            # Convert back to JSON to ensure proper formatting
+            return json.loads(json.dumps(parsed))
+        except (SyntaxError, ValueError) as e:
+            raise ValueError(f"Error parsing JSON content: {e}")
     
-def llm_call_post_process_response(model_settings: ModelSettings, messages: list[OpenAIMessage], response: Any) -> Any:
+def llm_call_post_process_response(model_settings: ModelSettings,
+                                   messages: list[OpenAIMessage],
+                                   response: Any) -> Any:
     
     # unswap roles for user
     if model_settings.role == 'user':
@@ -93,15 +115,15 @@ def llm_call_post_process_response(model_settings: ModelSettings, messages: list
     raw_message = response.choices[0].message
     response_message = OpenAIMessage(role=raw_message['role'], content=raw_message['content'])
     if model_settings.json_mode:
-        response_message.content = json.loads(response_message.content)
+        response_message.content = parse_json_content(response_message.content)
 
     return response_message
 
-def llm_messages_call(model_settings: ModelSettings, messages: list[OpenAIMessage] = []) -> OpenAIMessage:
+def llm_messages_call(model_settings: ModelSettings, messages: list[OpenAIMessage] = [], use_input_template=False) -> OpenAIMessage:
     '''Make an LLM call with the messages provided'''
 
     # get the params
-    params = llm_call_get_completion_params(model_settings, messages)
+    params = llm_call_get_completion_params(model_settings, messages, use_input_template)
 
     # call the LLM
     response = completion(**params)
@@ -111,11 +133,13 @@ def llm_messages_call(model_settings: ModelSettings, messages: list[OpenAIMessag
     
     return message
 
-async def allm_messages_call(model_settings: ModelSettings, messages: list[OpenAIMessage] = []) -> OpenAIMessage:
+async def allm_messages_call(model_settings: ModelSettings, 
+                             messages: list[OpenAIMessage] = [], 
+                             use_input_template=False) -> OpenAIMessage:
     '''Make an LLM call with the messages provided'''
 
     # get the params
-    params = llm_call_get_completion_params(model_settings, messages)
+    params = llm_call_get_completion_params(model_settings, messages, use_input_template)
 
     # call the LLM
     response = await acompletion(**params)
@@ -125,6 +149,94 @@ async def allm_messages_call(model_settings: ModelSettings, messages: list[OpenA
     
     return message
 
+
+async def aembed_text(text: str) -> str:
+    response = await aembedding('text-embedding-3-small', input=text, dimensions=512)
+    return response
+
 def messages_to_string(messages: list[OpenAIMessage]) -> str:
     '''Convert a list of messages to a string'''
     return '\n'.join([m.role + ':\n' + m.content for m in messages])
+
+
+# evaluator decorator to wrap an app scorer inside a EvalResult object
+# TODO: composable evaluators
+def evaluator(eval_func=None, *, repeat=1, embed_explanation=True) -> EvalResult:
+    def decorator(func):
+        @wraps(eval_func)
+        async def wrapper(run_data: RunData, *args, **kwargs):
+            async def single_run():
+                if asyncio.iscoroutinefunction(func):
+                    # If the eval_func is already a coroutine function, just await it
+                    response = await func(run_data.final_state, 
+                                          *args,
+                                          **kwargs
+                                          )
+                else:
+                    # If it's a regular function, run it in a thread pool
+                    response = await asyncio.to_thread(func, 
+                                                       run_data.final_state,
+                                                       *args,
+                                                       **kwargs
+                                                        )
+
+                # verify that the eval_func response is a tuple of 3 elements (score: Any, result: bool | None, explanation: str | None)
+                if not 2 <= len(response) <= 3 or \
+                    type(response) not in [list, tuple] or \
+                        type(response[1]) not in [bool, type(None)] or \
+                            (len(response) == 3 and type(response[2]) not in [str, type(None)]):
+                    raise ValueError('Evaluator response must be a tuple of 2 elements, the score of type Any and result of type bool | None')
+
+                # unpack results
+                score = None
+                result = None
+                explanation = None
+                if len(response) == 3 and response[2] is not None:
+                    score, result, explanation = response
+                    if embed_explanation:
+                        embedding = await aembed_text(explanation)
+                    return (score, result, explanation, embedding)
+
+                score, result = response
+                return (score, result, None, None)
+            
+            assert repeat >= 0, 'Repeat must be greater than 0'
+            
+            if repeat == 0:
+                return None
+
+            if repeat > 1:
+                tasks = [single_run() for _ in range(repeat)]
+                score_result_tuples = await asyncio.gather(*tasks)
+                scores, results, explanations, embeddings = zip(*score_result_tuples)
+
+                # for repeats, return the full array of scores and results
+                return EvalResult(
+                    scores,
+                    results,
+                    explanations,
+                    embeddings,
+                    run_data,
+                    func.__name__,
+                    repeat
+                )
+            else:
+                # for single runs, return a single score and result
+                score, result, explanation, embedding = await single_run()
+                return EvalResult(
+                    score,
+                    result,
+                    explanation,
+                    embedding,
+                    run_data,
+                    func.__name__,
+                    repeat
+                )
+
+        return wrapper
+
+    if eval_func is None:
+        return decorator
+    else:
+        return decorator(eval_func)
+

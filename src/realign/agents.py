@@ -30,6 +30,19 @@ class ChatAgent(AbstractAgent):
 
         super().__init__(**model_settings)
         
+    def generate_input(self) -> dict[str, Any]:
+        '''Generate input'''
+        
+        messages = []
+        
+        new_message: OpenAIMessage = llm_messages_call(model_settings=self.model_settings, messages=messages, use_input_template=True)
+        
+        new_message.role = self.model_settings.role
+        
+        messages.append(new_message)
+        
+        return messages
+        
     async def aprocess_turn(self, messages: list[OpenAIMessage] = []) -> list[OpenAIMessage]:
         '''Process a turn in the conversation'''
 
@@ -172,6 +185,10 @@ class SyntheticUserBuilder(AgentBuilder):
             print('Retrieved personas:', self.retrieved_personas)
         return self
     
+    def with_input_template(self, input_template: str) -> 'SyntheticUserBuilder':
+        self.synth_user_input_template = input_template
+        return self
+    
     def build(self) -> SyntheticUserAgent:
         
         assert self.retrieved_personas, "Personas must be fetched"
@@ -199,6 +216,8 @@ class SyntheticUserBuilder(AgentBuilder):
         # initialize the synthetic user agent with the generated prompt
         synthetic_user_agent = SyntheticUserAgent()
         synthetic_user_agent.model_settings.system_prompt = self.synth_user_system_prompt
+        if self.synth_user_input_template:
+            synthetic_user_agent.model_settings.input_template = self.synth_user_input_template
 
         return synthetic_user_agent
 
@@ -225,14 +244,10 @@ class SyntheticUserBuilder(AgentBuilder):
         persist_dir = "src/realign/persona-hub/cache"
         
         # use a smaller model for faster embeddings
-        # reduce the dimensions to 1024
+        # reduce the dimensions to 256
         Settings.embed_model = OpenAIEmbedding(
             model="text-embedding-3-small", dimensions=256
         )
-        
-        import os
-        # print the current path
-        print(os.getcwd())
         
         # check if directory exists
         if not os.path.exists(persist_dir):

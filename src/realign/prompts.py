@@ -27,9 +27,9 @@ As an LLM Agent instructor, you must design an instruction for a prudent Synthet
 [APP OBJECTIVE]
 {{app}}
 
-The Synthetic User Agent is someone who wants {{scenario}}. Your Synthetic User Agent will use a customer-facing application to test some features related to the scenario. Your instruction prompt should be creative and interesting to generate a diverse set of responses from the synthetic user agent for the scenario.
+The Synthetic User Agent is someone who wants to {{scenario}}. Your Synthetic User Agent will use a customer-facing application to test some features related to the scenario. Your instruction prompt should be creative and interesting to generate a diverse set of responses from the synthetic user agent for the scenario.
 
-Command your Synthetic User Agent in instruction format, starting with: 'Pretend that you are {{persona}}. You are intelligent, curt, and direct human. Talk strictly in conversation format. Extremely important: ALL your responses should be ONE sentence only and no more. Start by introducing yourself and stating what you'd like to do.' followed by detailed instructions on how to proceed with the scenario. 
+Command your Synthetic User Agent in instruction format, starting with: 'Pretend that you are {{persona}}. You are intelligent, curt, and direct human.'
 
 Respond ONLY with your generated prompt in the following JSON format: {'synth_user_system_prompt': GENERATED_USER_PROMPT}, for example {'synth_user_system_prompt': 'Pretend that you are...'}.
 '''

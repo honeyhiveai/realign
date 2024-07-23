@@ -23,25 +23,37 @@ class ModelSettings:
     system_prompt: Optional[str] = None
     json_mode: Optional[bool] = False
     role: str = 'assistant'
+    input_template: Optional[str] = None
     
     def resolve_response_mode(self) -> str:
         if self.json_mode or self.template:
             return { 'type': "json_object" }
         return None
     
-    def resolve_system_prompt(self) -> str:
+    def resolve_system_prompt(self, use_input_template=False) -> str:
         prompt_to_render = ''
         system_prompt = self.system_prompt
         template = self.template
-        if system_prompt == None:
-            if template == None:
+        if system_prompt is None:
+            if template is None:
                 raise ValueError("Either system_prompt or template must be provided in the model settings")
             else:
                 prompt_to_render = resolve_prompt_template(template)
         else:
             prompt_to_render = system_prompt
         
-        
+        if use_input_template:
+            assert self.input_template is not None, "Input template must be provided to resolve prompt"
+
+            response_format = '''Talk strictly in JSON format to populate the given template. Respond with a JSON where the keys are the template params for the template. Make sure that you respond with ALL the template params (marked with double curly braces) filled in. Do NOT include the curly braces in your response. Here is the template: \n[DERIVE TEMPLATE PARAM JSON FROM THIS TEMPLAET:]\n''' \
+                + self.input_template
+
+            self.json_mode = True
+        else:
+            response_format = '''Talk strictly in conversation format. Extremely important: ALL your responses should be ONE sentence only and no more. Start by introducing yourself and stating what you'd like to do.' followed by detailed instructions on how to proceed with the scenario.'''
+
+        prompt_to_render += '\n\n' + response_format
+
         jinja_template = Template(prompt_to_render)
         prompt_params = self.prompt_params
 
@@ -52,7 +64,7 @@ class ModelSettings:
         elif not all([type(k) == str for k in prompt_params.keys()]):
             raise ValueError("Prompt params keys must be strings")
         
-        # ensure that values are all strings
+        # ensure that keys and values are all strings
         for k, v in prompt_params.items():
             if type(k) != str:
                 raise ValueError("Prompt params keys must be strings")
@@ -154,6 +166,49 @@ class RunData:
         
         # Return the hexadecimal representation of the hash
         return hash_object.hexdigest()    
+    
+# this object contains a single score
+# the score can be of any type, including a list of scores
+class EvalResult:
+    def __init__(self, 
+                 score: Any, result: bool | None, 
+                 explanation: str | None = None, 
+                 embedding = None,
+                 run_data: RunData = None, 
+                 eval_name: str | None = None, 
+                 repeat: int = 1):
+        self.score = score
+        self.result = result
+        self.explanation = explanation
+        self.embedding = embedding
+        self.run_data = run_data
+        self.eval_name = eval_name
+        self.repeat = repeat
+
+    def __repr__(self):
+        # get the object id of the run_data
+        run_data_id = id(self.run_data) if self.run_data else None
+        return f'(eval_name: {self.eval_name}, run_data: {run_data_id}, score: {self.score}, result: {self.result}, explanation: {self.explanation})'
+    
+    def __str__(self):
+        return self.__repr__()
+    
+    def unpack(self):
+        if self.explanation:
+            return self.score, self.result, self.explanation
+        return self.score, self.result
+    
+    def __dict__(self):
+        return {
+            self.eval_name: {
+                'score': self.score,
+                'result': self.result,
+                'explanation': self.explanation,
+            }
+        }
+    
+    def to_dict(self):
+        return self.__dict__()
 
 '''
 ---
