@@ -36,7 +36,7 @@ def print_run_id(run_id):
     print('RUN ID:',run_id)
     print('-' * 100)
     
-def swap_roles(messages: list[dict[str, str]]) -> list[dict[str, str]]:
+def swap_roles(messages: list[OpenAIMessage]) -> list[OpenAIMessage]:
     for message in messages:
         if message.role == 'user':
             message.role = 'assistant'
@@ -62,10 +62,10 @@ def llm_call_get_completion_params(model_settings: ModelSettings, messages: list
         messages = swap_roles(messages)
     
     # get the response format
-    response_format = model_settings.resolve_response_mode()
+    response_format = model_settings.resolve_response_format()
     
     # resolve hyperparams
-    hyperparams = model_settings.hyperparams or {}
+    hyperparams = model_settings.hyperparams or dict()
     
     # resolve api_key
     api_key = None

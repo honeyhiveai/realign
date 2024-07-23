@@ -1,30 +1,38 @@
+from realign.prompts import resolve_prompt_template
 from dataclasses import dataclass
 from typing import Any, Optional
 import json
 import hashlib
 from jinja2 import Template
-from  realign.prompts import RATING_5_STAR, SYNTH_USER_PROMPT_GENERATOR_TEMPLATE
-
-def resolve_prompt_template(template_name: str):
-    if template_name == 'rating_5_star':
-        return RATING_5_STAR
-    elif template_name == 'synthetic_user_prompt_generator':
-        return SYNTH_USER_PROMPT_GENERATOR_TEMPLATE
-    raise ValueError("Template not found")
-
 
 @dataclass
 class ModelSettings:
-    model: str
+    # litellm model name. Refer to https://docs.litellm.ai/docs/providers.
+    model: str 
+    
+    # API key env variable name. 
+    # If not provided, defaults to <MODEL_PROVIDER>_API_KEY format
     api_key: Optional[str] = None
+    
+    # hyperparam dictionary in OpenAI format, eg. { 'temperature': 0.8 }
     hyperparams: Optional[dict[str, Any]] = None
+		
+    # literal system prompt
+    # if provided, template/prompt_params will be ignored
+    system_prompt: Optional[str] = None
+
+    # Jinja template and prompt_param dictionary to render it
+    # string key for the template. Actual templates defined in realign.prompts
     prompt_params: Optional[dict[str, str]] = None
     template: Optional[str] = None
-    system_prompt: Optional[str] = None
+
+    # json_mode for the response format
     json_mode: Optional[bool] = False
+    
+    # user or assistant
     role: str = 'assistant'
     
-    def resolve_response_mode(self) -> str:
+    def resolve_response_format(self) -> str:
         if self.json_mode or self.template:
             return { 'type': "json_object" }
         return None
@@ -80,37 +88,6 @@ class ModelSettings:
         )
 
 @dataclass
-class AgentConfig:
-    architecture: Any
-    model_settings: ModelSettings
-    role: str
-
-
-@dataclass
-class AppConfig:
-    agent: AgentConfig
-
-@dataclass
-class EvaluatorConfig:
-    model_settings: Optional[ModelSettings]
-    target: Optional[Any]
-    in_range: Optional[str]
-    
-@dataclass
-class EvaluatorsConfig:
-    evaluators: dict[str, EvaluatorConfig]
-
-@dataclass
-class SimulationTestConfig:
-    personas: dict[str, Any]
-    scenarios: dict[str, Any]
-
-@dataclass
-class SimulationConfig:
-    agent: AgentConfig
-    tests: SimulationTestConfig
-
-@dataclass
 class OpenAIMessage:
     role: str
     content: str | dict[str, str]
@@ -154,56 +131,3 @@ class RunData:
         
         # Return the hexadecimal representation of the hash
         return hash_object.hexdigest()    
-
-'''
----
-app:
-    agent_1:
-        architecture: SimpleChatbot
-        model_settings:
-            model: openai/gpt-4o
-            api_key: OPENAI_API_KEY
-            hyperparams:
-                temperature: 0.5
-            system_prompt: >
-                Be a good bot.
-            json_mode: off
-        role: 'assistant'
-    
-    agent_2: ...
-
-
-evaluators:
-    evaluator_1:
-        model_settings:
-            <<: *openai_gpt_4o
-            template: rating_5_star
-            system_prompt: Hello
-            json_mode: on
-            prompt_params: {}
-        target: '[4,5]' # target score range
-        in_range: numeric_range
-
-    evaluator_2: on
-    
-    ... templated evaluators ...
-    
-adversarial_simulations:
-    agent:
-        architecture: SimpleChatbot
-        model_settings: *mythomax
-        role: 'user'
-    
-    tests:
-        personas:
-            persona_1: someone
-            persona_2: someone
-        scenarios:
-            scenario_1: something
-            scenario_2: something
-
-    templates:
-        explicit_violence: on
-        sexual_content: on
-        profanity: on
-'''

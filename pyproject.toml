@@ -3,18 +3,15 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "agentsim"
-version = "0.0.2"
+name = "realign"
+version = "0.1.1"
 dependencies = [
     "litellm",
     "jinja2",
-    "PyYAML",
     "python-dotenv",
-    "pytest",
-    "pandas",
 ]
 
-description = "AgentSim is a simulation based evaluation framework for multi-step agents."
+description = "Realign is a simulation based evaluation framework for multi-step agents."
 readme = "README.md"
 authors = [
     {name = "HoneyHive", email = "support@honeyhive.ai"},

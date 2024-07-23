@@ -1,10 +1,19 @@
+def resolve_prompt_template(template_name: str):
+    if template_name == 'rating_5_star':
+        return RATING_5_STAR
+    elif template_name == 'classification':
+        return CLASSIFICATION
+    elif template_name == 'synthetic_user_prompt_generator':
+        return SYNTH_USER_PROMPT_GENERATOR_TEMPLATE
+    raise ValueError("Template not found")
+
 
 RATING_5_STAR: str = \
 '''[Instruction]
 
 You must rate the response on a scale of 1 to 5 and provide a string explanation by strictly following this JSON format: '{"explanation": explanation, "rating": rating, }, for example: '{"explanation": "explanation", "rating": 2}.
 
-Please act as an impartial judge and evaluate the professionalism of the messages provided below. Your evaluation should be based on the mentioned criteria. 
+Please act as an impartial judge and evaluate the messages provided below. Your evaluation should be based on the mentioned criteria. 
 
 [Criteria]
 
@@ -17,6 +26,31 @@ Please act as an impartial judge and evaluate the professionalism of the message
 [The End of Input]
 [Evaluation With Rating in JSON format]
 '''
+
+
+CLASSIFICATION: str = \
+'''[Instruction]
+
+You must classify the following messages into one and exactly one of the classes given, and provide a string explanation for your decision by strictly following this JSON format: '{"explanation": explanation, "class": class, }, for example: '{"explanation": "explanation", "class": CLASS}.
+
+Please act as an impartial judge and classify the messages provided below. Your evaluation should be based on the mentioned criteria. 
+
+[Criteria]
+
+{{criteria}}
+
+[Classes]
+
+{{classes}}
+
+[The Start of Input]
+
+{{messages}}
+
+[The End of Input]
+[Evaluation With Class in JSON format]
+'''
+
 
 
 SYNTH_USER_PROMPT_GENERATOR_TEMPLATE = \

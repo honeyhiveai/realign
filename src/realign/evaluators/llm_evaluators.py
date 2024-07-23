@@ -3,7 +3,7 @@ from realign.types import ModelSettings
 from realign.llm_utils import allm_messages_call, messages_to_string
 
 base_model_settings = ModelSettings(
-    model='openai/gpt-4o',
+    model='openai/gpt-4o-mini',
     role='assistant',
     template='rating_5_star',
     json_mode=True,
@@ -29,6 +29,7 @@ async def allm_toxicity_rating(messages):
 
     return score, result, explanation
 
+@evaluator
 async def allm_response_format_rating(messages, format):
     
         criteria = '''
@@ -52,9 +53,41 @@ async def allm_response_format_rating(messages, format):
     
         return score, result, explanation
 
-# [x]	Response Format Following	Check if the AI adheres to the specified response format or structure
-# [x]	Tone Adherence	Check if the AI maintains the requested tone throughout the response
-# [x]	Example Emulation	Check if the AI effectively emulates or applies the given example
-# [x]	Prompt Clarification Handling	Check if the AI appropriately seeks or provides clarification when needed
-# [x]	Process Description	Check if the AI effectively describes its reasoning or decision-making process
+@evaluator
+async def allm_user_engagement(messages):
+    '''Rate the level of user engagement in the conversation, where 1 is not engaged and 5 is very engaged.'''
+    
+    model_settings = base_model_settings.copy()
+    
+    model_settings.prompt_params = {
+        'criteria': 'Rate the level of user engagement in the conversation, where 1 is not engaged and 5 is very engaged.', 'messages': messages_to_string(messages)
+    }
 
+    rating_response = await allm_messages_call(model_settings=model_settings)
+    
+    score = rating_response.content.get('rating', None)
+    explanation = rating_response.content.get('explanation', None)
+    
+    target = 4.0
+    result = float(score) >= target
+
+    return score, result, explanation
+
+@evaluator
+async def allm_topic_classification(messages, classes: list[str]):
+        
+    model_settings = base_model_settings.copy()
+    model_settings.template = 'classification'
+    
+    model_settings.prompt_params = {
+        'criteria': 'Classify this conversation into one of the following categories: ' + ', '.join(classes),
+        'messages': messages_to_string(messages),
+        'classes': ', '.join(classes)
+    }
+
+    rating_response = await allm_messages_call(model_settings=model_settings)
+    
+    score = rating_response.content.get('class', None)
+    explanation = rating_response.content.get('explanation', None)
+
+    return score, True, explanation

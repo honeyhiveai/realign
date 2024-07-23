@@ -7,6 +7,7 @@ from realign.agents import AbstractAgent, AgentBuilder, SyntheticUserBuilder, Sy
 import asyncio
 from dotenv import load_dotenv
 import json
+import os
 
 class Simulation:
     # TODO: make synthetic user builder thread safe
@@ -17,6 +18,9 @@ class Simulation:
         # simulation params
         self.subroutine = subroutine
         self.runs = runs
+        
+        # sleep time (seconds) between turns to prevent rate limiting
+        self.sleep = 0.1
 
         # simulation components
         self.dataset: Dataset = None
@@ -31,7 +35,6 @@ class Simulation:
     async def subroutine(self, run_id: int) -> RunData:
         raise NotImplementedError("Simulation subroutine must be defined")
 
-    # llms as statisticians berkeley
     async def subroutine_with_evals(self, run_id: int, **subroutine_kwargs) -> Any:
         
         if not self.subroutine:
@@ -93,19 +96,25 @@ class Simulation:
         return data_obj
     
     def push_runs_to_dataset(self, dataset_path: str) -> None:
+
+        # if path does not exist, create it
+        if not os.path.exists(os.path.dirname(dataset_path)):
+            os.makedirs(os.path.dirname(dataset_path))
+
         # adds the results of the run to a new dataset
         with open(dataset_path, 'w') as f:
             json.dump(self.export_run_data(), f)
 
     def push_evals_dataset(self, evaluations_path: str) -> None:
-        
+
+        # if path does not exist, create it
+        if not os.path.exists(os.path.dirname(evaluations_path)):
+            os.makedirs(os.path.dirname(evaluations_path))
+
         # adds the evaluations of a run to a new dataset
         with open(evaluations_path, 'w') as f:
             json.dump(self.export_eval_results(), f)
 
-    def show_result(self) -> None:
-        # Implementation for showing simulation results
-        pass
 
 class ChatSimulation(Simulation):
     '''Responsible for simulating, maintaining, processing states'''
@@ -135,11 +144,16 @@ class ChatSimulation(Simulation):
             messages = await synth_user_agent.aprocess_turn(messages)
 
         while True:
+            # app turn
             if len(messages) > max_messages: break
             messages = await self.app.aprocess_turn(messages)
             print_run_id(run_id)
             print_chat([messages[-1]])
+    
+            # wait for 100ms so we don't hit rate limits
+            await asyncio.sleep(self.sleep)
 
+            # synthetic user turn
             if len(messages) > max_messages: break
             messages = await synth_user_agent.aprocess_turn(messages)
             print_run_id(run_id)
@@ -175,7 +189,3 @@ class ChatSimulation(Simulation):
         
         # Implementation for chat simulation run
         return super().run(synthetic_user_builder=self.simulator)
-            
-    def show_result(self) -> None:
-        # Implementation for showing chat simulation results
-        pass

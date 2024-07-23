@@ -62,8 +62,8 @@ isort==5.13.2
     # via pylint
 jinja2==3.1.4
     # via
-    #   agentsim (pyproject.toml)
     #   litellm
+    #   realign (pyproject.toml)
 jsonschema==4.23.0
     # via litellm
 jsonschema-specifications==2023.12.1
@@ -71,7 +71,7 @@ jsonschema-specifications==2023.12.1
 lazy-object-proxy==1.10.0
     # via astroid
 litellm==1.41.14
-    # via agentsim (pyproject.toml)
+    # via realign (pyproject.toml)
 markupsafe==2.1.5
     # via jinja2
 mccabe==0.7.0
@@ -93,13 +93,13 @@ pydantic==2.8.2
 pydantic-core==2.20.1
     # via pydantic
 pylint==2.16.2
-    # via agentsim (pyproject.toml)
+    # via realign (pyproject.toml)
 python-dotenv==1.0.1
-    # via litellm
-pyyaml==6.0.1
     # via
-    #   agentsim (pyproject.toml)
-    #   huggingface-hub
+    #   litellm
+    #   realign (pyproject.toml)
+pyyaml==6.0.1
+    # via huggingface-hub
 referencing==0.35.1
     # via
     #   jsonschema

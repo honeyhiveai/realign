@@ -1,9 +1,10 @@
-from realign.types import ModelSettings, OpenAIMessage, resolve_prompt_template
+from realign.types import ModelSettings, OpenAIMessage
+from realign.prompts import resolve_prompt_template
+from realign.llm_utils import llm_messages_call, allm_messages_call
 from typing import Optional, Any, Generator
 from abc import abstractmethod
 import json
 import os
-from realign.llm_utils import llm_messages_call, allm_messages_call
 
 class AbstractAgent:
     def __init__(self, **model_settings):
@@ -34,9 +35,6 @@ class ChatAgent(AbstractAgent):
         '''Process a turn in the conversation'''
 
         new_message: OpenAIMessage = await allm_messages_call(model_settings=self.model_settings, messages=messages)
-        
-        # wait for 100ms so we don't hit rate limits
-        # await asyncio.sleep(0.1)
 
         new_message.role = self.model_settings.role
         
@@ -58,23 +56,11 @@ class ChatAgent(AbstractAgent):
         return messages
 
 class AgentBuilder:
-    '''
-    @dataclass
-    class ModelSettings:
-        model: str
-        api_key: Optional[str] = None
-        hyperparams: Optional[dict[str, Any]] = None
-        prompt_params: Optional[dict[str, str]] = None
-        template: Optional[str] = None
-        system_prompt: Optional[str] = None
-        json_mode: Optional[bool] = False
-        role: str = 'assistant'
-    '''
     
     def __init__(self):
-        self.model_settings = None
-        self.system_prompt = ""
-        self.role = ""
+        self.model_settings: ModelSettings = None
+        self.system_prompt: str = ""
+        self.role: str = ""
 
     def with_model(self, model: str) -> 'AgentBuilder':
         self.model_settings.model = model
@@ -147,6 +133,8 @@ class SyntheticUserBuilder(AgentBuilder):
         self.synth_user_system_prompt = None
         self.num_personas = 3
         self.retrieved_personas = None
+        
+        self.synth_user_model = None
     
     def as_a(self, persona: str) -> 'SyntheticUserBuilder':
         self.persona = persona
@@ -172,6 +160,10 @@ class SyntheticUserBuilder(AgentBuilder):
             print('Retrieved personas:', self.retrieved_personas)
         return self
     
+    def with_synth_user_model(self, model: str) -> 'SyntheticUserBuilder':
+        self.synth_user_model = model
+        return self
+    
     def build(self) -> SyntheticUserAgent:
         
         assert self.retrieved_personas, "Personas must be fetched"
@@ -182,6 +174,9 @@ class SyntheticUserBuilder(AgentBuilder):
             
             # get the next persona
             next_persona = next(self.persona_generator)
+            
+            # copy the model settings
+            self.synth_user_builder_model_settings = self.synth_user_builder_model_settings.copy()
         
             # generate the synthetic user prompt
             self.synth_user_builder_model_settings.prompt_params = {
@@ -197,8 +192,12 @@ class SyntheticUserBuilder(AgentBuilder):
             self.synth_user_system_prompt = messages[-1].content['synth_user_system_prompt']
 
         # initialize the synthetic user agent with the generated prompt
-        synthetic_user_agent = SyntheticUserAgent()
+        if self.synth_user_model:
+            synthetic_user_agent = SyntheticUserAgent(model=self.synth_user_model)
+        else:
+            synthetic_user_agent = SyntheticUserAgent()
         synthetic_user_agent.model_settings.system_prompt = self.synth_user_system_prompt
+        self.synth_user_system_prompt = None
 
         return synthetic_user_agent
 
@@ -229,10 +228,6 @@ class SyntheticUserBuilder(AgentBuilder):
         Settings.embed_model = OpenAIEmbedding(
             model="text-embedding-3-small", dimensions=256
         )
-        
-        import os
-        # print the current path
-        print(os.getcwd())
         
         # check if directory exists
         if not os.path.exists(persist_dir):

@@ -4,9 +4,10 @@ __pycache__
 .DS_Store
 dump.rdb
 tmp/
-agentsim.egg-info/
+realign.egg-info/
 venv/
 build/
 .pytest_cache/
 TODO.md
 lab
+data
