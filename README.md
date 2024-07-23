@@ -31,6 +31,8 @@ Realign addresses these challenges by:
 5. Define custom evaluators aligned with your domain and use-case
 
 ## Quickstart
+ 
+ We'll be walking through an example. To skip the tutorial and run the file, `pip install realign`, paste [this file](https://github.com/honeyhiveai/realign/blob/main/examples/example_chat_simulation.py) into your editor, and run.
 
 Let’s say you want to build a tutor assistant that helps a student learn a new concept. At first, it might be difficult to tune the prompt and evaluate results. Simulation can be a powerful tool to help you prototype your application quickly.
 
@@ -163,11 +165,12 @@ def evaluator(output):
 The `output` is a key-value pair of various output params. For example, a multi step application could have the output:
 
 ```python
-output = { 'messages': [ 
-							{'role': 'user', 'content': 'What is the capital of France?'}, 
-							{'role': 'assistant', 'content': 'The capital of France is Paris'}
-						]
-					}
+output = {
+  'messages': [ 
+    {'role': 'user', 'content': 'What is the capital of France?'}, 
+    {'role': 'assistant', 'content': 'The capital of France is Paris'}
+  ]
+}
 ```
 
 ### What is the @evaluator decorator?
@@ -253,14 +256,9 @@ In Realign, there are 2 types of datasets:
 - The Run Dataset stores the final state of your simulation run (messages for chat simulations)
 - The Eval Dataset stores the evaluation results and scores of your simulation runs
 
-For multi turn agents such as chat, you must follow the schema
+The `simulation.push_runs_to_dataset()` and `simulation.push_evals_dataset()` functions are used to save the run and eval data to a json file respectively.
 
-| input | output | ground_truth | metadata |
-| --- | --- | --- | --- |
-| {’user_question’: 'What is the capital of France?'} |  | {'messages': [ 
-{'role': 'user', 'content': 'What is the capital of France?'}, 
-{'role': 'assistant', 'content': 'The capital of France is Paris'}
-]} | capitals |
+Dataset tooling is coming soon!
 
 ## Simulation
 
@@ -296,3 +294,74 @@ You might wonder why we pass in a SyntheticUserBuilder instead of a SyntheticUse
 - Synthetic user builder yields a new persona for every simulation run
 - The SyntheticUserBuilder is initialized using persona and scenario. Each run will have variants of different personas based on what you specify.
 - Realign’s SyntheticUserBuilder leverages 1000 personas specified in the `persona-hub/personas.jsonl` file. For more information, please refer to the [Persona Hub paper.](https://arxiv.org/pdf/2406.20094)
+
+
+# Contributing
+
+We welcome contributions from the community to help make Realign better. This guide will help you get started. If you have any questions, please reach out to us on [Discord](https://discord.gg/vqctGpqA97) or through a [GitHub issue](https://github.com/honeyhiveai/realign/issues/new).
+
+## Project Overview
+
+Realign is an MIT licensed testing framework for multi-turn AI applications. It simulates user interactions, evaluates AI performance, and generates adverserial test cases.
+
+We particularly welcome contributions in the following areas:
+
+- Bug fixes
+- Documentation updates, including examples and guides
+
+## Getting Started
+
+1. Fork the repository on GitHub.
+2. Clone your fork locally:
+
+   ```sh
+   git clone https://github.com/[your-username]/realign.git
+   cd realign
+   ```
+
+3. Set up your development environment:
+
+   ```sh
+   pip install -r requirements.txt
+   ```
+
+
+## Development Workflow
+
+1. Create a new branch for your feature or bug fix:
+
+   ```sh
+   git checkout -b feature/your-feature-name
+   ```
+
+2. We try to follow the [Conventional Commits](https://www.conventionalcommits.org/) specification. This is not required for feature branches. We merge all PRs into `main` with a squash merge and a conventional commit message.
+
+3. Push your branch to your fork:
+
+   ```sh
+   git push origin your-branch-name
+   ```
+
+4. Open a pull request against the `main` branch of the promptfoo repository.
+
+When opening a pull request:
+
+- Keep changes small and focused. Avoid mixing refactors with new features.
+- Ensure test coverage for new code or bug fixes.
+- Provide clear instructions on how to reproduce the problem or test the new feature.
+- Be responsive to feedback and be prepared to make changes if requested.
+- Ensure your tests are passing and your code is properly linted.
+
+Don't hesitate to ask for help. We're here to support you. If you're worried about whether your PR will be accepted, please talk to us first (see [Getting Help](#getting-help)).
+
+
+## Getting Help
+
+If you need help or have questions, you can:
+
+- Open an issue on GitHub.
+- Join our [Discord community](https://discord.gg/vqctGpqA97).
+
+## Code of Conduct
+
+We follow the [Contributor Covenant Code of Conduct](https://www.contributor-covenant.org/). Please read and adhere to it in all interactions within our community.
