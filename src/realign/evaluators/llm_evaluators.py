@@ -1,6 +1,5 @@
-from realign.evaluation import evaluator
 from realign.types import ModelSettings
-from realign.llm_utils import allm_messages_call, messages_to_string
+from realign.llm_utils import evaluator, allm_messages_call, messages_to_string
 
 base_model_settings = ModelSettings(
     model='openai/gpt-4o-mini',

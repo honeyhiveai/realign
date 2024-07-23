@@ -131,3 +131,47 @@ class RunData:
         
         # Return the hexadecimal representation of the hash
         return hash_object.hexdigest()    
+
+
+# this object contains a single score
+# the score can be of any type, including a list of scores
+class EvalResult:
+    def __init__(self, 
+                 score: Any, result: bool | None, 
+                 explanation: str | None = None, 
+                 embedding = None,
+                 run_data: RunData = None, 
+                 eval_name: str | None = None, 
+                 repeat: int = 1):
+        self.score = score
+        self.result = result
+        self.explanation = explanation
+        self.embedding = embedding
+        self.run_data = run_data
+        self.eval_name = eval_name
+        self.repeat = repeat
+
+    def __repr__(self):
+        # get the object id of the run_data
+        run_data_id = id(self.run_data) if self.run_data else None
+        return f'(eval_name: {self.eval_name}, run_data: {run_data_id}, score: {self.score}, result: {self.result}, explanation: {self.explanation})'
+    
+    def __str__(self):
+        return self.__repr__()
+    
+    def unpack(self):
+        if self.explanation:
+            return self.score, self.result, self.explanation
+        return self.score, self.result
+    
+    def __dict__(self):
+        return {
+            self.eval_name: {
+                'score': self.score,
+                'result': self.result,
+                'explanation': self.explanation,
+            }
+        }
+    
+    def to_dict(self):
+        return self.__dict__()

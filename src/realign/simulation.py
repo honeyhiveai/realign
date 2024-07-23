@@ -1,6 +1,6 @@
 from typing import Any, Self
 from realign.datasets import Dataset, ChatDataset
-from realign.evaluation import Evaluation
+from realign.evaluation import EvalResult
 from realign.types import RunData, OpenAIMessage
 from realign.llm_utils import print_system_prompt, print_chat, print_run_id
 from realign.agents import AbstractAgent, AgentBuilder, SyntheticUserBuilder, SyntheticUserAgent, ChatAgent
@@ -30,7 +30,7 @@ class Simulation:
 
         # results
         self.run_data: dict[int, RunData] = dict()
-        self.eval_results: dict[int, Evaluation] = dict()
+        self.eval_results: dict[int, EvalResult] = dict()
 
     async def subroutine(self, run_id: int) -> RunData:
         raise NotImplementedError("Simulation subroutine must be defined")
@@ -56,7 +56,7 @@ class Simulation:
             eval_tasks.append(asyncio.create_task(eval_func(sim_run_data)))
 
         # await all the evaluators
-        evals: list[Evaluation] = await asyncio.gather(*eval_tasks)
+        evals: list[EvalResult] = await asyncio.gather(*eval_tasks)
         
         # save the evaluation results
         self.eval_results[run_id] = evals
