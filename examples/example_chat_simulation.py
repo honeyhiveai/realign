@@ -4,8 +4,8 @@ from realign.simulation import ChatSimulation
 from realign.evaluators.llm_evaluators import allm_toxicity_rating, allm_user_engagement
 
 # initialize simulation
-simulation = ChatSimulation(runs=3, max_messages=2)
-simulation.sleep = 0.01 # to prevent rate limiting
+simulation = ChatSimulation(runs=3, max_messages=6)
+simulation.sleep = 0.25 # to prevent rate limiting
 
 # initialize your app agent
 simulation.app = ChatAgent(system_prompt='''
@@ -20,7 +20,7 @@ simulation.simulator = SyntheticUserBuilder().as_a('undergrad student').they_wan
 # simulation.simulator.with_synth_user_model('openai/gpt-4o-mini')
 
 # add evaluators
-# simulation.evaluators = [allm_toxicity_rating, allm_user_engagement]
+simulation.evaluators = [allm_toxicity_rating, allm_user_engagement]
 
 # run simulation
 simulation.run()
