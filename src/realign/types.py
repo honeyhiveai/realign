@@ -1,5 +1,6 @@
 from realign.prompts import resolve_prompt_template
 from dataclasses import dataclass
+from litellm import validate_environment
 from typing import Any, Optional
 import json
 import hashlib
@@ -74,6 +75,12 @@ class ModelSettings:
             raise ValueError(f"Error rendering system prompt: {e}")
         
         return render
+    
+    def validate_keys(self):
+        # validate that the API keys are set
+        model_key_validation = validate_environment(self.model)
+        if not model_key_validation['keys_in_environment']:
+            raise ValueError(f'Could not find the following API keys in the environment: {','.join(model_key_validation['missing_keys'])}. Please set these keys in the environment.')
     
     def copy(self):
         return ModelSettings(
@@ -154,7 +161,10 @@ class EvalResult:
     def __repr__(self):
         # get the object id of the run_data
         run_data_id = id(self.run_data) if self.run_data else None
-        return f'(eval_name: {self.eval_name}, run_data: {run_data_id}, score: {self.score}, result: {self.result}, explanation: {self.explanation})'
+        return f'eval_name:   {self.eval_name}\n' + \
+               f'score:       {self.score}\n' + \
+               f'result:      {self.result}\n' + \
+               f'explanation: {self.explanation}\n'
     
     def __str__(self):
         return self.__repr__()
