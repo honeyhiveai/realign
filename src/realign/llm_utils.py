@@ -1,6 +1,7 @@
 from realign.types import ModelSettings, OpenAIMessage, RunData, EvalResult
 from typing import Any
-from litellm import completion, acompletion, aembedding
+from litellm import completion, acompletion, aembedding, validate_environment
+
 import os
 import json
 import asyncio
@@ -37,7 +38,14 @@ def print_run_id(run_id):
     print('-' * 100)
     print('RUN ID:',run_id)
     print('-' * 100)
-    
+
+def print_evals(evals: list[EvalResult]):
+    print(bcolors.WARNING)
+    for e in evals:
+        print(e)
+        print('- ' * 50)
+    print(bcolors.ENDC)
+
 def swap_roles(messages: list[OpenAIMessage]) -> list[OpenAIMessage]:
     for message in messages:
         if message.role == 'user':
@@ -50,6 +58,9 @@ def llm_call_get_completion_params(model_settings: ModelSettings, messages: list
         
     # resolve the prompt
     system_prompt = model_settings.resolve_system_prompt()
+    
+    # validate the keys
+    model_settings.validate_keys()    
     
     # insert the system prompt
     if len(messages) == 0:
@@ -107,7 +118,7 @@ def llm_messages_call(model_settings: ModelSettings, messages: list[OpenAIMessag
 
     # call the LLM
     response = completion(**params)
-    
+
     # post process the response
     message: OpenAIMessage = llm_call_post_process_response(model_settings, messages, response)
     

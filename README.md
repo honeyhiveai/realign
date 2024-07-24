@@ -2,9 +2,25 @@
 
 Realign is a testing framework for multi-turn AI applications. It simulates user interactions, evaluates AI performance, and generates adverserial test cases.
 
-## Installation
+## Installation & Setup
+
+To install the package, run
 
 `pip install realign`
+
+Set your API keys as environment variables:
+
+```sh
+export OPENAI_API_KEY="your_openai_key"
+export GROQ_API_KEY="your_groq_key"
+```
+
+or put them in a `.env` file:
+
+```sh
+OPENAI_API_KEY="your_openai_key"
+GROQ_API_KEY="your_groq_key"
+```
 
 ## Why We Built Realign
 
@@ -70,9 +86,7 @@ We then set the simulator which will run your app. In the ChatSimulation case, t
 
 ```python
 # initialize your synthetic user agent builder
-simulation.simulator = SyntheticUserBuilder()
-														.as_a('student') \
-														.they_want_to('learn something new')
+simulation.simulator = SyntheticUserBuilder().as_a('student').they_want_to('learn something new')
 														
 # Generates personas whose first chat message is as follows:
 # Hi, I'm Saman, a graduate student at Duke Kunshan University, and I'd love to dive into the world of quantum mechanics starting with an overview of the field.
@@ -178,6 +192,8 @@ output = {
 The `@evaluator` decorator simply helps you wrap your evaluator output as an object which has some in built helpers. Importantly, it allows you do use your evaluation as a guardrail in your code as follows:
 
 ```python
+from realign.evaluators.llm_evaluators import allm_toxicity_rating, allm_topic_classification
+
 import asyncio
 
 async def main():

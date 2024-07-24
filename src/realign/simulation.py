@@ -2,7 +2,7 @@ from typing import Any, Self
 from realign.datasets import Dataset, ChatDataset
 from realign.evaluation import EvalResult
 from realign.types import RunData, OpenAIMessage
-from realign.llm_utils import print_system_prompt, print_chat, print_run_id
+from realign.llm_utils import print_system_prompt, print_chat, print_run_id, print_evals
 from realign.agents import AbstractAgent, AgentBuilder, SyntheticUserBuilder, SyntheticUserAgent, ChatAgent
 import asyncio
 from dotenv import load_dotenv
@@ -60,6 +60,10 @@ class Simulation:
         
         # save the evaluation results
         self.eval_results[run_id] = evals
+        
+        # print the results
+        print_run_id(run_id)
+        print_evals(evals)
 
     # returns a reference to itself to chain more methods
     def run(self, synthetic_user_builder: SyntheticUserBuilder) -> Self:
@@ -103,7 +107,7 @@ class Simulation:
 
         # adds the results of the run to a new dataset
         with open(dataset_path, 'w') as f:
-            json.dump(self.export_run_data(), f)
+            json.dump(self.export_run_data(), f, indent=4)
 
     def push_evals_dataset(self, evaluations_path: str) -> None:
 
@@ -113,7 +117,7 @@ class Simulation:
 
         # adds the evaluations of a run to a new dataset
         with open(evaluations_path, 'w') as f:
-            json.dump(self.export_eval_results(), f)
+            json.dump(self.export_eval_results(), f, indent=4)
 
 
 class ChatSimulation(Simulation):
@@ -142,6 +146,8 @@ class ChatSimulation(Simulation):
         messages = []
         if self.first_turn_role == 'user' and max_messages > 0:
             messages = await synth_user_agent.aprocess_turn(messages)
+            print_run_id(run_id)
+            print_chat([messages[-1]])   
 
         while True:
             # app turn
@@ -154,11 +160,11 @@ class ChatSimulation(Simulation):
             await asyncio.sleep(self.sleep)
 
             # synthetic user turn
-            if len(messages) > max_messages: break
+            if len(messages)  > max_messages: break
             messages = await synth_user_agent.aprocess_turn(messages)
             print_run_id(run_id)
             print_chat([messages[-1]])
-        
+
         return messages
 
     def __init__(self,
@@ -181,7 +187,7 @@ class ChatSimulation(Simulation):
 
         if not self.app:
             self.app = ChatAgent()
-        
+
         if not self.simulator:
             self.simulator = SyntheticUserBuilder()
 

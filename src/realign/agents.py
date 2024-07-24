@@ -157,7 +157,9 @@ class SyntheticUserBuilder(AgentBuilder):
             self.retrieved_personas: list[str] = self.get_personas_from_hub(self.persona)
             self.current_persona_index = 0
             self.persona_generator = self.get_persona_generator()
-            print('Retrieved personas:', self.retrieved_personas)
+            print('Retrieved personas:')
+            for p in self.retrieved_personas:
+                print('-', p)
         return self
     
     def with_synth_user_model(self, model: str) -> 'SyntheticUserBuilder':
@@ -229,6 +231,10 @@ class SyntheticUserBuilder(AgentBuilder):
         Settings.embed_model = OpenAIEmbedding(
             model="text-embedding-3-small", dimensions=512
         )
+
+        # raise if OPENAI_API_KEY is not set in your environment
+        if not os.getenv("OPENAI_API_KEY"):
+            raise ValueError("OPENAI_API_KEY not set in environment")
         
         # check if directory exists
         if not os.path.exists(persist_dir):
