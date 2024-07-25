@@ -1,6 +1,6 @@
 import unittest
-from ..src.realign.base_class import BaseClass
-from ..src.realign.types import EvalResult, RunData
+from realign.base_class import BaseClass
+from realign.types import EvalResult, RunData
 import os
 import json
 
