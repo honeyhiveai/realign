@@ -45,6 +45,10 @@ class BaseClass:
     def run(self) -> 'BaseClass':
         raise NotImplementedError("run must be defined in the subclass")
 
+    def subroutine(self, run_id: int, **subroutine_kwargs) -> Any:
+        # Define the subroutine method to be callable
+        pass
+
     def export_eval_results(self) -> Dict:
         data_obj = {'run_data_hash': [], 'metadata': [], 'evaluations': []}
         for run_id, evals in self.eval_results.items():
