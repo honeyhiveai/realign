@@ -22,7 +22,7 @@ class TestBaseClassSubroutine(unittest.TestCase):
 class TestBaseClassExportEvalResults(unittest.TestCase):
     def test_export_eval_results(self):
         base_instance = BaseClass()
-        run_data = RunData()
+        run_data = RunData(final_state="some_state")
         eval_result = EvalResult()
         base_instance.run_data[1] = run_data
         base_instance.eval_results[1] = [eval_result]
@@ -36,7 +36,7 @@ class TestBaseClassExportEvalResults(unittest.TestCase):
 class TestBaseClassPushEvalsDataset(unittest.TestCase):
     def test_push_evals_dataset(self):
         base_instance = BaseClass()
-        run_data = RunData()
+        run_data = RunData(final_state="some_state")
         eval_result = EvalResult()
         base_instance.run_data[1] = run_data
         base_instance.eval_results[1] = [eval_result]
