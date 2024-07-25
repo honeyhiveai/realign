@@ -42,9 +42,9 @@ class Evaluation(BaseClass):  # Inherit from BaseClass
         super().__init__()
         self.dataset: Dataset = None
 
-    def run(self) -> Evaluation:
+    def run(self) -> 'Evaluation':
         load_dotenv()
-        
+
         if not self.dataset:
             raise ValueError("Evaluation dataset must be defined")
 
@@ -54,7 +54,7 @@ class Evaluation(BaseClass):  # Inherit from BaseClass
         tasks = [self.subroutine_with_evals(run_id=self.dataset.data['metadata'][i]['run_id']) for i in range(len(self.dataset.data['metadata']))]
 
         loop.run_until_complete(asyncio.gather(*tasks))
-        
+
         return self
     
     # WIP: Clustering evaluations
