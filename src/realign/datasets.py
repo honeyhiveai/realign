@@ -1,4 +1,4 @@
-from realign.types import OpenAIMessage
+from .types import OpenAIMessage
 import json
 
 class Dataset:
@@ -17,7 +17,7 @@ class Dataset:
         for key in ['inputs', 'outputs', 'ground_truths', 'metadata']:
             if key not in data:
                 raise ValueError(f"Dataset must have a '{key}' key")
-        
+
         return True
 
     def __init__(self, file_path: str = None):
@@ -41,7 +41,7 @@ class Dataset:
                     self.data = data
 
 class ChatDataset(Dataset):
- 
+
     def validate_and_load_chat(self) -> bool:
 
         # load each messages in the ground truth
@@ -50,7 +50,7 @@ class ChatDataset(Dataset):
             # output must be a dictionary
             if type(self.data['outputs'][i]) != dict:
                 raise ValueError("Output must be a dictionary")
-            
+
             # ground truth must have messages key
             if 'messages' not in self.data['outputs'][i]:
                 raise ValueError("Outputs must have a 'messages' key")
@@ -62,7 +62,7 @@ class ChatDataset(Dataset):
                 messages.append(OpenAIMessage(role=message['role'], content=message['content']))
             self.data['outputs'][i]['messages'] = messages
         return True
- 
+
     def __init__(self, file_path: str):
         super().__init__(file_path) # sets self.data
         self.validate_and_load_chat() # validates and loads the chat data into self.data
