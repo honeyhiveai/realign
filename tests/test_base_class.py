@@ -1,8 +1,14 @@
 import unittest
-from realign.base_class import BaseClass
-from realign.types import EvalResult, RunData
 import os
 import json
+import sys
+import os
+
+# Add the parent directory of 'realign' to the Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from src.realign.base_class import BaseClass
+from src.realign.types import EvalResult, RunData
 
 class ConcreteBaseClass(BaseClass):
     def create_run_data(self, final_state, run_id):
