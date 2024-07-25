@@ -4,9 +4,19 @@ from realign.types import EvalResult, RunData
 import os
 import json
 
+class ConcreteBaseClass(BaseClass):
+    def create_run_data(self, final_state, run_id):
+        return {"run_id": run_id, "final_state": final_state}
+
+    def run(self):
+        return self
+
+    def subroutine(self, run_id, **subroutine_kwargs):
+        return f"Subroutine executed for run_id: {run_id}"
+
 class TestBaseClassInitialization(unittest.TestCase):
     def test_initialization(self):
-        base_instance = BaseClass()
+        base_instance = ConcreteBaseClass()
         self.assertIsInstance(base_instance, BaseClass)
         # Add more assertions to verify the initialization state of BaseClass
         self.assertIsNotNone(base_instance.evaluators)
@@ -15,13 +25,13 @@ class TestBaseClassInitialization(unittest.TestCase):
 
 class TestBaseClassSubroutine(unittest.TestCase):
     def test_subroutine(self):
-        base_instance = BaseClass()
-        with self.assertRaises(NotImplementedError):
-            base_instance.subroutine()
+        base_instance = ConcreteBaseClass()
+        result = base_instance.subroutine(1)
+        self.assertEqual(result, "Subroutine executed for run_id: 1")
 
 class TestBaseClassExportEvalResults(unittest.TestCase):
     def test_export_eval_results(self):
-        base_instance = BaseClass()
+        base_instance = ConcreteBaseClass()
         run_data = RunData(final_state="some_state")
         eval_result = EvalResult(score=0.0, result={})
         base_instance.run_data[1] = run_data
@@ -35,7 +45,7 @@ class TestBaseClassExportEvalResults(unittest.TestCase):
 
 class TestBaseClassPushEvalsDataset(unittest.TestCase):
     def test_push_evals_dataset(self):
-        base_instance = BaseClass()
+        base_instance = ConcreteBaseClass()
         run_data = RunData(final_state="some_state")
         eval_result = EvalResult(score=0.0, result={})
         base_instance.run_data[1] = run_data
