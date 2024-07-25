@@ -1,12 +1,18 @@
 import unittest
-from realign.evaluation import Evaluation
-from realign.datasets import Dataset
+import sys
+import os
+
+# Add the parent directory of 'realign' to the Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from src.realign.evaluation import Evaluation
+from src.realign.datasets import Dataset
 
 class ConcreteEvaluation(Evaluation):
     def create_run_data(self, final_state, run_id):
         return {"run_id": run_id, "final_state": final_state}
 
-    async def subroutine(self):
+    def subroutine(self):
         return "Subroutine executed"
 
 class TestEvaluationInitialization(unittest.TestCase):
