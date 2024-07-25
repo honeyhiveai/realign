@@ -50,7 +50,7 @@ class BaseClass(ABC):
 
     @abstractmethod
     def subroutine(self, run_id: int, **subroutine_kwargs) -> Any:
-        pass
+        raise NotImplementedError("Subclass must implement abstract method")
 
     def export_eval_results(self) -> Dict:
         data_obj = {'run_data_hash': [], 'metadata': [], 'evaluations': []}
