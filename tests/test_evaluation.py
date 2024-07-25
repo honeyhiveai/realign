@@ -12,8 +12,8 @@ class ConcreteEvaluation(Evaluation):
     def create_run_data(self, final_state, run_id):
         return {"run_id": run_id, "final_state": final_state}
 
-    def subroutine(self):
-        return "Subroutine executed"
+    def subroutine(self, run_id, **subroutine_kwargs):
+        return f"Subroutine executed for run_id: {run_id}"
 
 class TestEvaluationInitialization(unittest.TestCase):
     def test_initialization(self):
@@ -28,8 +28,8 @@ class TestEvaluationInitialization(unittest.TestCase):
 class TestEvaluationSubroutine(unittest.TestCase):
     def test_subroutine(self):
         evaluation_instance = ConcreteEvaluation()
-        result = evaluation_instance.subroutine()
-        self.assertEqual(result, "Subroutine executed")
+        result = evaluation_instance.subroutine(1)
+        self.assertEqual(result, "Subroutine executed for run_id: 1")
 
 class TestEvaluationVisualization(unittest.TestCase):
     def test_visualization(self):
