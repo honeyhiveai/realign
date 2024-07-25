@@ -1,10 +1,10 @@
 from typing import Any
-from realign.types import EvalResult, RunData
-from realign.datasets import Dataset
+from .types import EvalResult, RunData
+from .datasets import Dataset
 from dotenv import load_dotenv
 import asyncio
 import json
-from realign.base_class import BaseClass  # Import BaseClass
+from .base_class import BaseClass  # Import BaseClass
 
 class Evaluation(BaseClass):  # Inherit from BaseClass
     
