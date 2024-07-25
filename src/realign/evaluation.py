@@ -1,4 +1,4 @@
-from typing import Any, Self
+from typing import Any
 from realign.types import EvalResult, RunData
 from realign.datasets import Dataset
 from dotenv import load_dotenv
@@ -42,7 +42,7 @@ class Evaluation(BaseClass):  # Inherit from BaseClass
         super().__init__()
         self.dataset: Dataset = None
 
-    def run(self) -> Self:
+    def run(self) -> Evaluation:
         load_dotenv()
         
         if not self.dataset:
