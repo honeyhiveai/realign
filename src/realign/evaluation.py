@@ -1,4 +1,4 @@
-from typing import Any, Callable
+from typing import Any, Callable, List
 from abc import abstractmethod
 from .types import EvalResult, RunData
 from .datasets import Dataset
@@ -9,38 +9,35 @@ from .base_class import BaseClass  # Import BaseClass
 
 class Evaluation(BaseClass):  # Inherit from BaseClass
     
-    def subroutine(self, run_id: int, **subroutine_kwargs) -> Callable[[], str]:
+    def subroutine(self, run_id: int, **subroutine_kwargs) -> Callable[[], Any]:
         """
         Basic implementation of the subroutine method.
         This method returns a callable object (lambda function) that, when called,
-        returns a string with the run_id.
+        returns a value with the run_id.
         This can be overridden in subclasses to provide custom behavior.
         """
         return lambda: f"Default subroutine executed for run_id: {run_id}"
 
     async def subroutine_with_evals(self, run_id: int, **subroutine_kwargs) -> Any:
-
         if not self.subroutine:
-            raise ValueError("Simulation subroutine must be defined")
+            raise ValueError("Evaluation subroutine must be defined")
 
-        # run the simulation subroutine
-        subroutine_result = await self.subroutine(run_id, **subroutine_kwargs)
-        final_state = subroutine_result() if callable(subroutine_result) else subroutine_result
+        # run the evaluation subroutine
+        subroutine_result = self.subroutine(run_id, **subroutine_kwargs)
+        final_state = await subroutine_result if asyncio.iscoroutine(subroutine_result) else subroutine_result
+        final_state = final_state() if callable(final_state) else final_state
 
-        # wrap the simulation run as an object
-        sim_run_data = RunData(final_state, run_id=run_id)
+        # wrap the evaluation run as an object
+        run_data = self.create_run_data(final_state, run_id)
 
         # save the run data
-        self.run_data[run_id] = sim_run_data
+        self.run_data[run_id] = run_data
 
         # run the evaluators
-        eval_tasks = []
-        for eval_func in self.evaluators:
-            # pass object reference to the @evaluator decorator
-            eval_tasks.append(asyncio.create_task(eval_func(sim_run_data)))
+        eval_tasks = [asyncio.create_task(eval_func(run_data)) for eval_func in self.evaluators]
 
         # await all the evaluators
-        evals: list[EvalResult] = await asyncio.gather(*eval_tasks)
+        evals: List[EvalResult] = await asyncio.gather(*eval_tasks)
 
         # save the evaluation results
         self.eval_results[run_id] = evals
