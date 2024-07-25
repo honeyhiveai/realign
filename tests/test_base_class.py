@@ -24,10 +24,13 @@ class TestBaseClassInitialization(unittest.TestCase):
         self.assertIsInstance(base_instance.eval_results, dict)
 
 class TestBaseClassSubroutine(unittest.TestCase):
-    def test_subroutine(self):
+    async def test_subroutine(self):
         base_instance = ConcreteBaseClass()
-        result = asyncio.run(base_instance.subroutine(1))
+        result = await base_instance.subroutine(1)
         self.assertEqual(result, "Subroutine executed for run_id: 1")
+
+    def test_subroutine_wrapper(self):
+        asyncio.run(self.test_subroutine())
 
 class TestBaseClassExportEvalResults(unittest.TestCase):
     def test_export_eval_results(self):
