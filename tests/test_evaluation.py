@@ -2,9 +2,16 @@ import unittest
 from realign.evaluation import Evaluation
 from realign.datasets import Dataset
 
+class ConcreteEvaluation(Evaluation):
+    def create_run_data(self, final_state, run_id):
+        return {"run_id": run_id, "final_state": final_state}
+
+    async def subroutine(self):
+        return "Subroutine executed"
+
 class TestEvaluationInitialization(unittest.TestCase):
     def test_initialization(self):
-        evaluation_instance = Evaluation()
+        evaluation_instance = ConcreteEvaluation()
         self.assertIsInstance(evaluation_instance, Evaluation)
         # Add more assertions to verify the initialization state of Evaluation
         self.assertIsNone(evaluation_instance.dataset)
@@ -14,13 +21,13 @@ class TestEvaluationInitialization(unittest.TestCase):
 
 class TestEvaluationSubroutine(unittest.TestCase):
     def test_subroutine(self):
-        evaluation_instance = Evaluation()
-        with self.assertRaises(NotImplementedError):
-            evaluation_instance.subroutine()
+        evaluation_instance = ConcreteEvaluation()
+        result = evaluation_instance.subroutine()
+        self.assertEqual(result, "Subroutine executed")
 
 class TestEvaluationVisualization(unittest.TestCase):
     def test_visualization(self):
-        evaluation_instance = Evaluation()
+        evaluation_instance = ConcreteEvaluation()
         # Assuming the visualization method generates a plot, we can check if it runs without errors
         try:
             evaluation_instance.visualization()
