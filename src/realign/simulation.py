@@ -1,4 +1,4 @@
-from typing import Any, Self
+from typing import Any
 from realign.datasets import Dataset, ChatDataset
 from realign.evaluation import EvalResult
 from realign.types import RunData, OpenAIMessage
@@ -23,11 +23,11 @@ class Simulation(BaseClass):  # Inherit from BaseClass
         self.app: AbstractAgent = None
         self.simulator: AgentBuilder = None
 
-    async def subroutine(self, run_id: int) -> RunData:
+    def subroutine(self, run_id: int) -> RunData:
         raise NotImplementedError("Simulation subroutine must be defined")
 
     # returns a reference to itself to chain more methods
-    def run(self, synthetic_user_builder: SyntheticUserBuilder) -> Self:
+    def run(self, synthetic_user_builder: SyntheticUserBuilder) -> 'Simulation':
         load_dotenv()
 
         # create an asyncio loop
@@ -35,7 +35,7 @@ class Simulation(BaseClass):  # Inherit from BaseClass
 
         # run the simulation subroutine self.runs times
         app_objective = self.app.model_settings.resolve_system_prompt()
-        
+
         synth_users = []
         for _ in range(self.runs):
             synethic_user_agent = synthetic_user_builder.with_app_objective(app_objective) \
@@ -45,17 +45,13 @@ class Simulation(BaseClass):  # Inherit from BaseClass
 
         tasks = [self.subroutine_with_evals(run_id, synth_user_agent=synth_users[run_id]) for run_id in range(self.runs)]
         loop.run_until_complete(asyncio.gather(*tasks))
-        
+
         return self
-    
+
     def export_run_data(self) -> dict:
         raise NotImplementedError("Simulation export_run_data must be defined")
-    
 
-
-    
     def push_runs_to_dataset(self, dataset_path: str) -> None:
-
         # if path does not exist, create it
         if not os.path.exists(os.path.dirname(dataset_path)):
             os.makedirs(os.path.dirname(dataset_path))
@@ -138,7 +134,7 @@ class ChatSimulation(Simulation):
         if not self.simulator:
             self.simulator = SyntheticUserBuilder()
 
-    def run(self) -> Self:
-        
+    def run(self) -> 'ChatSimulation':
+
         # Implementation for chat simulation run
         return super().run(synthetic_user_builder=self.simulator)

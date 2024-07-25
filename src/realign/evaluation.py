@@ -1,4 +1,5 @@
-from typing import Any
+from typing import Any, Callable
+from abc import abstractmethod
 from .types import EvalResult, RunData
 from .datasets import Dataset
 from dotenv import load_dotenv
@@ -8,23 +9,30 @@ from .base_class import BaseClass  # Import BaseClass
 
 class Evaluation(BaseClass):  # Inherit from BaseClass
     
-    async def subroutine(self) -> Any:
-        raise NotImplementedError("Evaluation subroutine must be defined")
+    def subroutine(self, run_id: int, **subroutine_kwargs) -> Callable[[], str]:
+        """
+        Basic implementation of the subroutine method.
+        This method returns a callable object (lambda function) that, when called,
+        returns a string with the run_id.
+        This can be overridden in subclasses to provide custom behavior.
+        """
+        return lambda: f"Default subroutine executed for run_id: {run_id}"
 
     async def subroutine_with_evals(self, run_id: int, **subroutine_kwargs) -> Any:
-        
+
         if not self.subroutine:
             raise ValueError("Simulation subroutine must be defined")
 
         # run the simulation subroutine
-        final_state = await self.subroutine(run_id, **subroutine_kwargs)
+        subroutine_result = await self.subroutine(run_id, **subroutine_kwargs)
+        final_state = subroutine_result() if callable(subroutine_result) else subroutine_result
 
         # wrap the simulation run as an object
         sim_run_data = RunData(final_state, run_id=run_id)
-        
+
         # save the run data
         self.run_data[run_id] = sim_run_data
-        
+
         # run the evaluators
         eval_tasks = []
         for eval_func in self.evaluators:
@@ -33,14 +41,18 @@ class Evaluation(BaseClass):  # Inherit from BaseClass
 
         # await all the evaluators
         evals: list[EvalResult] = await asyncio.gather(*eval_tasks)
-        
+
         # save the evaluation results
         self.eval_results[run_id] = evals
+
+        return final_state
     
     
     def __init__(self):
         super().__init__()
         self.dataset: Dataset = None
+        if not hasattr(self, 'subroutine') or self.subroutine is None:
+            self.subroutine = self.__class__.subroutine
 
     def run(self) -> 'Evaluation':
         load_dotenv()

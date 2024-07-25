@@ -4,13 +4,16 @@ import json
 import sys
 import asyncio
 
-# Add the parent directory of 'realign' to the Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Add the 'src' directory to the Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
 from src.realign.base_class import BaseClass
 from src.realign.types import EvalResult, RunData
 
 class ConcreteBaseClass(BaseClass):
+    def __init__(self):
+        super().__init__(self.subroutine)
+
     def create_run_data(self, final_state, run_id):
         return {"run_id": run_id, "final_state": final_state}
 
@@ -29,13 +32,26 @@ class TestBaseClassInitialization(unittest.TestCase):
         self.assertIsInstance(base_instance.eval_results, dict)
 
 class TestBaseClassSubroutine(unittest.TestCase):
-    async def async_test_subroutine(self):
+    def test_subroutine(self):
         base_instance = ConcreteBaseClass()
-        result = await base_instance.subroutine(1)
+        result = asyncio.run(base_instance.subroutine(1))
         self.assertEqual(result, "Subroutine executed for run_id: 1")
 
-    def test_subroutine(self):
-        asyncio.run(self.async_test_subroutine())
+class TestBaseClassSubroutineWithEvals(unittest.TestCase):
+    def setUp(self):
+        self.base_instance = ConcreteBaseClass()
+        self.base_instance.evaluators = [self.dummy_evaluator]
+
+    async def dummy_evaluator(self, run_data):
+        return EvalResult(score=1.0, result={"dummy": "evaluation"})
+
+    def test_subroutine_with_evals(self):
+        result = asyncio.run(self.base_instance.subroutine_with_evals(1))
+        self.assertEqual(result, "Subroutine executed for run_id: 1")
+        self.assertIn(1, self.base_instance.run_data)
+        self.assertIn(1, self.base_instance.eval_results)
+        self.assertEqual(len(self.base_instance.eval_results[1]), 1)
+        self.assertEqual(self.base_instance.eval_results[1][0].score, 1.0)
 
 class TestBaseClassExportEvalResults(unittest.TestCase):
     def test_export_eval_results(self):
