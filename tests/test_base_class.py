@@ -3,7 +3,6 @@ from realign.base_class import BaseClass
 from realign.types import EvalResult, RunData
 import os
 import json
-import asyncio
 
 class ConcreteBaseClass(BaseClass):
     def create_run_data(self, final_state, run_id):
@@ -12,7 +11,7 @@ class ConcreteBaseClass(BaseClass):
     def run(self):
         return self
 
-    async def subroutine(self, run_id, **subroutine_kwargs):
+    def subroutine(self, run_id, **subroutine_kwargs):
         return f"Subroutine executed for run_id: {run_id}"
 
 class TestBaseClassInitialization(unittest.TestCase):
@@ -24,13 +23,10 @@ class TestBaseClassInitialization(unittest.TestCase):
         self.assertIsInstance(base_instance.eval_results, dict)
 
 class TestBaseClassSubroutine(unittest.TestCase):
-    async def test_subroutine(self):
+    def test_subroutine(self):
         base_instance = ConcreteBaseClass()
-        result = await base_instance.subroutine(1)
+        result = base_instance.subroutine(1)
         self.assertEqual(result, "Subroutine executed for run_id: 1")
-
-    def test_subroutine_wrapper(self):
-        asyncio.run(self.test_subroutine())
 
 class TestBaseClassExportEvalResults(unittest.TestCase):
     def test_export_eval_results(self):
