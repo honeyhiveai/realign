@@ -1,8 +1,9 @@
 import asyncio
 import json
+from abc import ABC, abstractmethod
 from typing import Any, Dict, List
 
-class BaseClass:
+class BaseClass(ABC):
     def __init__(self, subroutine: Any = None, runs: int = 1):
         self.subroutine = subroutine
         self.runs = runs
@@ -39,14 +40,16 @@ class BaseClass:
 
         return final_state
 
+    @abstractmethod
     def create_run_data(self, final_state: Any, run_id: int) -> Any:
         raise NotImplementedError("create_run_data must be defined in the subclass")
 
+    @abstractmethod
     def run(self) -> 'BaseClass':
         raise NotImplementedError("run must be defined in the subclass")
 
+    @abstractmethod
     def subroutine(self, run_id: int, **subroutine_kwargs) -> Any:
-        # Define the subroutine method to be callable
         pass
 
     def export_eval_results(self) -> Dict:
