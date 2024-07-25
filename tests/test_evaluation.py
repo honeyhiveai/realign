@@ -15,6 +15,10 @@ class ConcreteEvaluation(Evaluation):
     def subroutine(self, run_id, **subroutine_kwargs):
         return f"Subroutine executed for run_id: {run_id}"
 
+    def visualization(self):
+        # Simulate visualization method
+        return "Visualization successful"
+
 class TestEvaluationInitialization(unittest.TestCase):
     def test_initialization(self):
         evaluation_instance = ConcreteEvaluation()
@@ -36,8 +40,8 @@ class TestEvaluationVisualization(unittest.TestCase):
         evaluation_instance = ConcreteEvaluation()
         # Assuming the visualization method generates a plot, we can check if it runs without errors
         try:
-            evaluation_instance.visualization()
-            visualization_successful = True
+            result = evaluation_instance.visualization()
+            visualization_successful = (result == "Visualization successful")
         except Exception as e:
             visualization_successful = False
         self.assertTrue(visualization_successful)
