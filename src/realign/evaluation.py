@@ -115,9 +115,14 @@ class Evaluation(BaseClass):  # Inherit from BaseClass
             #                 textcoords='offset points', fontsize=8, alpha=0.7)  
           
         plt.title("Clusters identified visualized in language 2d using t-SNE")
-        plt.show()    
+        plt.show()
 
     # Removed export_eval_results method as it is implemented in BaseClass
+
+    def visualization(self):
+        print("Generating visualization...")
+        # Placeholder for future implementation of more complex visualization
+        return True
 
 class ChatEvaluation(Evaluation):
     async def chat_evaluation_subroutine(self, run_id: int) -> Any:
