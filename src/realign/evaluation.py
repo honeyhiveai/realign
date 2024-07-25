@@ -1,12 +1,12 @@
-
 from typing import Any, Self
 from realign.types import EvalResult, RunData
 from realign.datasets import Dataset
 from dotenv import load_dotenv
 import asyncio
 import json
+from realign.base_class import BaseClass  # Import BaseClass
 
-class Evaluation:
+class Evaluation(BaseClass):  # Inherit from BaseClass
     
     async def subroutine(self) -> Any:
         raise NotImplementedError("Evaluation subroutine must be defined")
@@ -39,12 +39,9 @@ class Evaluation:
     
     
     def __init__(self):
+        super().__init__()
         self.dataset: Dataset = None
-        self.evaluators = []
-        
-        self.run_data: dict[int, RunData] = dict()
-        self.eval_results: dict[int, EvalResult] = dict()
-        
+
     def run(self) -> Self:
         load_dotenv()
         
@@ -120,20 +117,7 @@ class Evaluation:
         plt.title("Clusters identified visualized in language 2d using t-SNE")
         plt.show()    
 
-    def export_eval_results(self) -> dict:
-        # {'run_data_hash': [], eval_name': [], 'metadata': [], 'score': [], 'result': []}
-        data_obj = {'run_data_hash': [], 'metadata': [], 'evaluations': []}
-        for run_id, evals in self.eval_results.items():
-            data_obj['run_data_hash'].append(self.run_data[run_id].compute_hash())
-            for evaluation_obj in evals:
-                data_obj['evaluations'].append(evaluation_obj.to_dict())
-        return data_obj
-
-    def push_evals_dataset(self, evaluations_path: str) -> None:
-        
-        # adds the evaluations of a run to a new dataset
-        with open(evaluations_path, 'w') as f:
-            json.dump(self.export_eval_results(), f)
+    # Removed export_eval_results method as it is implemented in BaseClass
 
 class ChatEvaluation(Evaluation):
     async def chat_evaluation_subroutine(self, run_id: int) -> Any:
