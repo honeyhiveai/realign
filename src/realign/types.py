@@ -80,7 +80,7 @@ class ModelSettings:
         # validate that the API keys are set
         model_key_validation = validate_environment(self.model)
         if not model_key_validation['keys_in_environment']:
-            raise ValueError(f'Could not find the following API keys in the environment: {','.join(model_key_validation['missing_keys'])}. Please set these keys in the environment.')
+            raise ValueError(f"Could not find the following API keys in the environment: {','.join(model_key_validation['missing_keys'])}. Please set these keys in the environment.")
     
     def copy(self):
         return ModelSettings(
