@@ -1,53 +1,59 @@
-
-from typing import Any, Self
-from realign.types import EvalResult, RunData
-from realign.datasets import Dataset
+from typing import Any, Callable, List
+from abc import abstractmethod
+from .types import EvalResult, RunData
+from .datasets import Dataset
 from dotenv import load_dotenv
 import asyncio
 import json
+from .base_class import BaseClass  # Import BaseClass
 
-class Evaluation:
+class Evaluation(BaseClass):  # Inherit from BaseClass
     
-    async def subroutine(self) -> Any:
-        raise NotImplementedError("Evaluation subroutine must be defined")
+    def subroutine(self, run_id: int, **subroutine_kwargs) -> Callable[[], Any]:
+        """
+        Basic implementation of the subroutine method.
+        This method returns a callable object (lambda function) that, when called,
+        returns a value with the run_id.
+        This can be overridden in subclasses to provide custom behavior.
+        """
+        return lambda: f"Default subroutine executed for run_id: {run_id}"
 
     async def subroutine_with_evals(self, run_id: int, **subroutine_kwargs) -> Any:
-        
         if not self.subroutine:
-            raise ValueError("Simulation subroutine must be defined")
+            raise ValueError("Evaluation subroutine must be defined")
 
-        # run the simulation subroutine
-        final_state = await self.subroutine(run_id, **subroutine_kwargs)
+        # run the evaluation subroutine
+        subroutine_result = self.subroutine(run_id, **subroutine_kwargs)
+        final_state = await subroutine_result if asyncio.iscoroutine(subroutine_result) else subroutine_result
+        final_state = final_state() if callable(final_state) else final_state
 
-        # wrap the simulation run as an object
-        sim_run_data = RunData(final_state, run_id=run_id)
-        
+        # wrap the evaluation run as an object
+        run_data = self.create_run_data(final_state, run_id)
+
         # save the run data
-        self.run_data[run_id] = sim_run_data
-        
+        self.run_data[run_id] = run_data
+
         # run the evaluators
-        eval_tasks = []
-        for eval_func in self.evaluators:
-            # pass object reference to the @evaluator decorator
-            eval_tasks.append(asyncio.create_task(eval_func(sim_run_data)))
+        eval_tasks = [asyncio.create_task(eval_func(run_data)) for eval_func in self.evaluators]
 
         # await all the evaluators
-        evals: list[EvalResult] = await asyncio.gather(*eval_tasks)
-        
+        evals: List[EvalResult] = await asyncio.gather(*eval_tasks)
+
         # save the evaluation results
         self.eval_results[run_id] = evals
+
+        return final_state
     
     
     def __init__(self):
+        super().__init__()
         self.dataset: Dataset = None
-        self.evaluators = []
-        
-        self.run_data: dict[int, RunData] = dict()
-        self.eval_results: dict[int, EvalResult] = dict()
-        
-    def run(self) -> Self:
+        if not hasattr(self, 'subroutine') or self.subroutine is None:
+            self.subroutine = self.__class__.subroutine
+
+    def run(self) -> 'Evaluation':
         load_dotenv()
-        
+
         if not self.dataset:
             raise ValueError("Evaluation dataset must be defined")
 
@@ -57,7 +63,7 @@ class Evaluation:
         tasks = [self.subroutine_with_evals(run_id=self.dataset.data['metadata'][i]['run_id']) for i in range(len(self.dataset.data['metadata']))]
 
         loop.run_until_complete(asyncio.gather(*tasks))
-        
+
         return self
     
     # WIP: Clustering evaluations
@@ -118,22 +124,14 @@ class Evaluation:
             #                 textcoords='offset points', fontsize=8, alpha=0.7)  
           
         plt.title("Clusters identified visualized in language 2d using t-SNE")
-        plt.show()    
+        plt.show()
 
-    def export_eval_results(self) -> dict:
-        # {'run_data_hash': [], eval_name': [], 'metadata': [], 'score': [], 'result': []}
-        data_obj = {'run_data_hash': [], 'metadata': [], 'evaluations': []}
-        for run_id, evals in self.eval_results.items():
-            data_obj['run_data_hash'].append(self.run_data[run_id].compute_hash())
-            for evaluation_obj in evals:
-                data_obj['evaluations'].append(evaluation_obj.to_dict())
-        return data_obj
+    # Removed export_eval_results method as it is implemented in BaseClass
 
-    def push_evals_dataset(self, evaluations_path: str) -> None:
-        
-        # adds the evaluations of a run to a new dataset
-        with open(evaluations_path, 'w') as f:
-            json.dump(self.export_eval_results(), f)
+    def visualization(self):
+        print("Generating visualization...")
+        # Placeholder for future implementation of more complex visualization
+        return True
 
 class ChatEvaluation(Evaluation):
     async def chat_evaluation_subroutine(self, run_id: int) -> Any:

@@ -1,4 +1,4 @@
-from typing import Any, Self
+from typing import Any
 from realign.datasets import Dataset, ChatDataset
 from realign.evaluation import EvalResult
 from realign.types import RunData, OpenAIMessage
@@ -8,65 +8,26 @@ import asyncio
 from dotenv import load_dotenv
 import json
 import os
+from realign.base_class import BaseClass  # Import BaseClass
 
-class Simulation:
+class Simulation(BaseClass):  # Inherit from BaseClass
     # TODO: make synthetic user builder thread safe
 
     def __init__(self, subroutine: Any, runs: int = 1):
-        super().__init__()
-        
-        # simulation params
-        self.subroutine = subroutine
-        self.runs = runs
-        
+        super().__init__(subroutine, runs)
+
         # sleep time (seconds) between turns to prevent rate limiting
         self.sleep = 0.1
 
         # simulation components
-        self.dataset: Dataset = None
         self.app: AbstractAgent = None
         self.simulator: AgentBuilder = None
-        self.evaluators: list[callable] = []
 
-        # results
-        self.run_data: dict[int, RunData] = dict()
-        self.eval_results: dict[int, EvalResult] = dict()
-
-    async def subroutine(self, run_id: int) -> RunData:
+    def subroutine(self, run_id: int) -> RunData:
         raise NotImplementedError("Simulation subroutine must be defined")
 
-    async def subroutine_with_evals(self, run_id: int, **subroutine_kwargs) -> Any:
-        
-        if not self.subroutine:
-            raise ValueError("Simulation subroutine must be defined")
-
-        # run the simulation subroutine
-        final_state = await self.subroutine(run_id, **subroutine_kwargs)
-
-        # wrap the simulation run as an object
-        sim_run_data = RunData(final_state, run_id=run_id)
-        
-        # save the run data
-        self.run_data[run_id] = sim_run_data
-        
-        # run the evaluators
-        eval_tasks = []
-        for eval_func in self.evaluators:
-            # pass object reference to the @evaluator decorator
-            eval_tasks.append(asyncio.create_task(eval_func(sim_run_data)))
-
-        # await all the evaluators
-        evals: list[EvalResult] = await asyncio.gather(*eval_tasks)
-        
-        # save the evaluation results
-        self.eval_results[run_id] = evals
-        
-        # print the results
-        print_run_id(run_id)
-        print_evals(evals)
-
     # returns a reference to itself to chain more methods
-    def run(self, synthetic_user_builder: SyntheticUserBuilder) -> Self:
+    def run(self, synthetic_user_builder: SyntheticUserBuilder) -> 'Simulation':
         load_dotenv()
 
         # create an asyncio loop
@@ -74,7 +35,7 @@ class Simulation:
 
         # run the simulation subroutine self.runs times
         app_objective = self.app.model_settings.resolve_system_prompt()
-        
+
         synth_users = []
         for _ in range(self.runs):
             synethic_user_agent = synthetic_user_builder.with_app_objective(app_objective) \
@@ -84,23 +45,13 @@ class Simulation:
 
         tasks = [self.subroutine_with_evals(run_id, synth_user_agent=synth_users[run_id]) for run_id in range(self.runs)]
         loop.run_until_complete(asyncio.gather(*tasks))
-        
+
         return self
-    
+
     def export_run_data(self) -> dict:
         raise NotImplementedError("Simulation export_run_data must be defined")
-    
-    def export_eval_results(self) -> dict:
-        # {'run_data_hash': [], eval_name': [], 'metadata': [], 'score': [], 'result': []}
-        data_obj = {'run_data_hash': [], 'metadata': [], 'evaluations': []}
-        for run_id, evals in self.eval_results.items():
-            data_obj['run_data_hash'].append(self.run_data[run_id].compute_hash())
-            for evaluation_obj in evals:
-                data_obj['evaluations'].append(evaluation_obj.to_dict())
-        return data_obj
-    
-    def push_runs_to_dataset(self, dataset_path: str) -> None:
 
+    def push_runs_to_dataset(self, dataset_path: str) -> None:
         # if path does not exist, create it
         if not os.path.exists(os.path.dirname(dataset_path)):
             os.makedirs(os.path.dirname(dataset_path))
@@ -109,15 +60,7 @@ class Simulation:
         with open(dataset_path, 'w') as f:
             json.dump(self.export_run_data(), f, indent=4)
 
-    def push_evals_dataset(self, evaluations_path: str) -> None:
 
-        # if path does not exist, create it
-        if not os.path.exists(os.path.dirname(evaluations_path)):
-            os.makedirs(os.path.dirname(evaluations_path))
-
-        # adds the evaluations of a run to a new dataset
-        with open(evaluations_path, 'w') as f:
-            json.dump(self.export_eval_results(), f, indent=4)
 
 
 class ChatSimulation(Simulation):
@@ -191,7 +134,7 @@ class ChatSimulation(Simulation):
         if not self.simulator:
             self.simulator = SyntheticUserBuilder()
 
-    def run(self) -> Self:
-        
+    def run(self) -> 'ChatSimulation':
+
         # Implementation for chat simulation run
         return super().run(synthetic_user_builder=self.simulator)
