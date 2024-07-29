@@ -155,9 +155,6 @@ class ChatSimulation(Simulation):
             messages = await self.app.aprocess_turn(messages)
             print_run_id(run_id)
             print_chat([messages[-1]])
-    
-            # wait for 100ms so we don't hit rate limits
-            await asyncio.sleep(self.sleep)
 
             # synthetic user turn
             if len(messages)  > max_messages: break

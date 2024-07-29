@@ -1,6 +1,6 @@
 from realign.types import ModelSettings, OpenAIMessage, RunData, EvalResult
 from typing import Any
-from litellm import completion, acompletion, aembedding, validate_environment
+from litellm import completion, acompletion, aembedding
 
 import os
 import json
@@ -25,7 +25,7 @@ def print_system_prompt(model_settings: ModelSettings):
     elif model_settings.role == 'assistant':
         print(bcolors.HEADER + '\nASSISTANT SYSTEM PROMPT\n\n', model_settings.system_prompt, bcolors.ENDC)
 
-def print_chat(messages):
+def print_chat(messages: list[OpenAIMessage]):
     for m in messages:
         if m.role == 'user':
             print(bcolors.OKBLUE + '\n', m.role.upper(), '\n\n', m.content, bcolors.ENDC)

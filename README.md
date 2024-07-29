@@ -12,14 +12,12 @@ Set your API keys as environment variables:
 
 ```sh
 export OPENAI_API_KEY="your_openai_key"
-export GROQ_API_KEY="your_groq_key"
 ```
 
 or put them in a `.env` file:
 
 ```sh
 OPENAI_API_KEY="your_openai_key"
-GROQ_API_KEY="your_groq_key"
 ```
 
 ## Why We Built Realign
@@ -69,17 +67,16 @@ from realign.evaluators.llm_evaluators import allm_toxicity_rating, allm_user_en
 
 # initialize simulation
 simulation = ChatSimulation(runs=3, max_messages=10)
-simulation.sleep = 0.25 # to prevent rate limiting
 ```
 
-Next, we set the `simulation.app` param. This is your main `ChatAgent` that you want to test. We will use `openai/gpt-4o-mini` to run our application.
+Next, we set the `simulation.app` param. This is your main `ChatAgent` that you want to test. 
 
 ```python
 # initialize your app agent
 simulation.app = ChatAgent(system_prompt='''
     As an AI tutor, your role is to guide student learning across various subjects through explanations and questions. \
     Assess student knowledge and adapt your approach accordingly, providing clear explanations with simple terms and examples.
-''', model='openai/gpt-4o-mini')
+''')
 ```
 
 We then set the simulator which will run your app. In the ChatSimulation case, the simulator is a synthetic user generator. We use the `SyntheticUserBuilder` utility to specify a persona and scenario. Realign leverages 1000 diverse personas to seed each simulated conversation and create diverse scenarios.
@@ -97,7 +94,7 @@ simulation.simulator = SyntheticUserBuilder().as_a('student').they_want_to('lear
 # simulation.simulator.with_synth_user_model('openai/gpt-4o-mini')
 ```
 
-We want the simulation be fast, and so the default synthetic user uses `groq/llama3-8b-8192`, which supports inferences at ~1000 tokens per second. You can create the Groq API key from [here](https://console.groq.com/keys). If you want to use OpenAI instead, simply pass in the model into your SyntheticUserBuilder as specified above.
+We want the simulation be fast, and so the default synthetic user uses `openai/gpt-4o-mini`.
 
 Finally, we specify a list of evaluators which will be run after each simulation run is complete. To create your own custom evaluators, refer to the docs below.
 

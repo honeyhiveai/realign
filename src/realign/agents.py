@@ -25,7 +25,7 @@ class ChatAgent(AbstractAgent):
 
     def __init__(self, **model_settings):
         model_settings = model_settings or {'model_settings': ModelSettings(
-            model='groq/llama3-8b-8192',
+            model='openai/gpt-4o-mini',
             role='assistant',
         )}
 
@@ -106,7 +106,7 @@ class SyntheticUserAgent(ChatAgent):
     
     def __init__(self, **model_settings):
         model_settings = model_settings or {'model_settings': ModelSettings(
-            model='groq/llama3-8b-8192',
+            model='openai/gpt-4o-mini',
             role='user',
         )}
         self.role = 'user'
@@ -122,8 +122,7 @@ class SyntheticUserBuilder(AgentBuilder):
         self.persona = None
         self.scenario = None
         self.synth_user_builder_model_settings = ModelSettings(
-            model='openai/gpt-4o',
-            # model='groq/llama3-8b-8192',
+            model='openai/gpt-4o-mini',
             role='user',
             template='synthetic_user_prompt_generator',
             prompt_params={},
