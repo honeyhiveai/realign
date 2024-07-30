@@ -1,6 +1,8 @@
-# Realign: AI Evaluation and Simulation Framework
+![realign.png](site/realign_banner.png)
 
-Realign is a testing framework for multi-turn AI applications. It simulates user interactions, evaluates AI performance, and generates adverserial test cases.
+# AI Testing and Simulation Framework
+
+Realign is a testing and simulation framework for AI applications. It simulates user interactions, evaluates AI performance, and generates adverserial test cases to red-team AI applications.
 
 ## Installation & Setup
 
@@ -32,23 +34,23 @@ Testing multi-turn AI applications is hard. Here's why:
 Realign addresses these challenges by:
 
 - Simulating dynamic user behavior in real-time using LLMs
-- Automatically generating adverserial test cases
+- Automatically generating adverserial test cases, user personas, and scenarios using LLMs
 - Evaluating entire conversation flows, not just individual responses, using LLMs, binary classifiers, and more
-- Allowing custom evaluation criteria for specific use cases
+- Allowing custom evaluation criteria for domain-specific use cases
 
 ## Key Features
 
 1. Simulate user interactions over multiple turns
-2. Run component-level evaluations on specific steps, turns, and trajectories
+2. Run component-level evaluations on specific steps, turns, and entire conversation trajectories
 3. Synthetically generate test cases and simulation scenarios
-4. Run evaluations locally, in CI/CD pipelines, or as a unit-test in production
+4. Run tests and simulations locally or in CI/CD pipelines
 5. Define custom evaluators aligned with your domain and use-case
 
 ## Quickstart
  
  We'll be walking through an example. To skip the tutorial and run the file, `pip install realign`, paste [this file](https://github.com/honeyhiveai/realign/blob/main/examples/example_chat_simulation.py) into your editor, and run.
 
-Let’s say you want to build a tutor assistant that helps a student learn a new concept. At first, it might be difficult to tune the prompt and evaluate results. Simulation can be a powerful tool to help you prototype your application quickly.
+Let’s say you want to build a AI tutoring assistant that helps a student learn a new concept. At first, it might be difficult to tune the prompt and evaluate results. Simulation can be a powerful tool to help you develop and improve your application quickly.
 
 A simulation has 3 main steps:
 
