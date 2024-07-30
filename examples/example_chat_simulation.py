@@ -4,7 +4,7 @@ from realign.simulation import ChatSimulation
 from realign.evaluators.llm_evaluators import allm_toxicity_rating, allm_user_engagement
 
 # initialize simulation
-simulation = ChatSimulation(runs=30, max_messages=50)
+simulation = ChatSimulation(runs=20, max_messages=50)
 
 # initialize your app agent
 simulation.app = ChatAgent(system_prompt='''

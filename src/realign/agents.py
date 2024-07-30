@@ -5,6 +5,7 @@ from typing import Optional, Any, Generator
 from abc import abstractmethod
 import json
 import os
+import asyncio
 
 class AbstractAgent:
     def __init__(self, **model_settings):
@@ -199,6 +200,52 @@ class SyntheticUserBuilder(AgentBuilder):
             synthetic_user_agent = SyntheticUserAgent()
         synthetic_user_agent.model_settings.system_prompt = self.synth_user_system_prompt
         self.synth_user_system_prompt = None
+
+        return synthetic_user_agent
+
+    async def abuild_many(self, n: int) -> list[SyntheticUserAgent]:
+        # Create n agents concurrently
+        agents = await asyncio.gather(*[self.abuild(persona_idx) for persona_idx in range(n)])
+        return agents
+
+    async def abuild(self, persona_idx: int = 0) -> SyntheticUserAgent:
+        assert self.retrieved_personas, "Personas must be fetched"
+        assert persona_idx < len(self.retrieved_personas), "Persona index out of range"
+
+        if not self.synth_user_system_prompt:
+            if not self.persona:
+                raise ValueError("Persona must be set")
+            
+            # get the next persona
+            next_persona = self.retrieved_personas[persona_idx]
+            
+            # copy the model settings
+            settings_copy = self.synth_user_builder_model_settings.copy()
+        
+            # generate the synthetic user prompt
+            settings_copy.prompt_params = {
+                **settings_copy.prompt_params,
+                'scenario': self.scenario,
+                'persona': next_persona,
+            }
+
+            prompt_renderer_agent = ChatAgent(model_settings=settings_copy)
+            messages: list[OpenAIMessage] = await prompt_renderer_agent.aprocess_turn()
+            if len(messages) == 0:
+                raise ValueError("No messages generated")
+            system_prompt = messages[-1].content['synth_user_system_prompt']
+        else:
+            system_prompt = self.synth_user_system_prompt
+            self.synth_user_system_prompt = None
+
+        # initialize the synthetic user agent with the generated prompt
+        if self.synth_user_model:
+            synthetic_user_agent = SyntheticUserAgent(model=self.synth_user_model)
+        else:
+            synthetic_user_agent = SyntheticUserAgent()
+        synthetic_user_agent.model_settings.system_prompt = system_prompt
+        
+        print('Built synthetic user', persona_idx + 1)
 
         return synthetic_user_agent
 

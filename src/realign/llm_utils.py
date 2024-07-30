@@ -84,7 +84,10 @@ def llm_call_get_completion_params(model_settings: ModelSettings, messages: list
     api_key = None
     if model_settings.api_key:
         os.getenv(model_settings.api_key)
-        
+
+    # retry params
+    num_retries = 5
+
     # convert messages to dict
     messages_to_llm = [m.__dict__() for m in messages]
     
@@ -94,6 +97,7 @@ def llm_call_get_completion_params(model_settings: ModelSettings, messages: list
         'messages': messages_to_llm,
         'response_format': response_format,
         **hyperparams,
+        'num_retries': num_retries,
     }
     
 def llm_call_post_process_response(model_settings: ModelSettings, messages: list[OpenAIMessage], response: Any) -> Any:

@@ -67,23 +67,37 @@ class Simulation:
 
     # returns a reference to itself to chain more methods
     def run(self, synthetic_user_builder: SyntheticUserBuilder) -> Self:
+
+        # load environment variables
         load_dotenv()
 
-        # create an asyncio loop
-        loop = asyncio.get_event_loop()
-
-        # run the simulation subroutine self.runs times
+        # get the app system prompt
         app_objective = self.app.model_settings.resolve_system_prompt()
         
-        synth_users = []
-        for _ in range(self.runs):
-            synethic_user_agent = synthetic_user_builder.with_app_objective(app_objective) \
-                                                        .with_num_personas(self.runs) \
-                                                        .fetch_personas().build()
-            synth_users.append(synethic_user_agent)
+        synthetic_user_builder.with_app_objective(app_objective) \
+                              .with_num_personas(self.runs) \
+                              .fetch_personas()
+        
+        # Create a new event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            # Run build_many in the new loop
+            synth_users = loop.run_until_complete(synthetic_user_builder.abuild_many(n=self.runs))
+            
+            # Create tasks using the same loop
+            tasks = [
+                self.subroutine_with_evals(run_id, synth_user_agent=synth_users[run_id]) 
+                for run_id in range(self.runs)
+            ]
+            
+            # Run tasks in the same loop
+            loop.run_until_complete(asyncio.gather(*tasks))
 
-        tasks = [self.subroutine_with_evals(run_id, synth_user_agent=synth_users[run_id]) for run_id in range(self.runs)]
-        loop.run_until_complete(asyncio.gather(*tasks))
+        finally:
+            # Close the loop
+            loop.close()
         
         return self
     
