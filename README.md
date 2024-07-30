@@ -58,7 +58,7 @@ A simulation has 3 main steps:
 
 ![simulation.png](site/simulation.png)
 
-We first initialize the `ChatSimulation` so and ask it to run 3 conversations of 10 messages each. We add a small sleep between turns to prevent rate limiting.
+We first initialize the `ChatSimulation` so and ask it to run 3 conversations of 10 messages each. 
 
 ```python
 from realign.agents import ChatAgent, SyntheticUserBuilder
@@ -66,7 +66,7 @@ from realign.simulation import ChatSimulation
 from realign.evaluators.llm_evaluators import allm_toxicity_rating, allm_user_engagement
 
 # initialize simulation
-simulation = ChatSimulation(runs=3, max_messages=10)
+simulation = ChatSimulation(runs=10, max_messages=20)
 ```
 
 Next, we set the `simulation.app` param. This is your main `ChatAgent` that you want to test. 
@@ -122,8 +122,7 @@ from realign.simulation import ChatSimulation
 from realign.evaluators.llm_evaluators import allm_toxicity_rating, allm_user_engagement
 
 # initialize simulation
-simulation = ChatSimulation(runs=3, max_messages=10)
-simulation.sleep = 0.25 # to prevent rate limiting
+simulation = ChatSimulation(runs=10, max_messages=20)
 
 # initialize your app agent
 simulation.app = ChatAgent(system_prompt='''

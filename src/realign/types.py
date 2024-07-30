@@ -183,5 +183,5 @@ class EvalResult:
             }
         }
     
-    def to_dict(self):
+    def to_dict(self) -> dict:
         return self.__dict__()

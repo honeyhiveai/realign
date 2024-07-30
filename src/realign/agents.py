@@ -280,7 +280,7 @@ class SyntheticUserBuilder(AgentBuilder):
 
         # raise if OPENAI_API_KEY is not set in your environment
         if not os.getenv("OPENAI_API_KEY"):
-            raise ValueError("OPENAI_API_KEY not set in environment")
+            raise ValueError("OPENAI_API_KEY not set in environment. It is used to generate personas.")
         
         # check if directory exists
         if not os.path.exists(persist_dir):

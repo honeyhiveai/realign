@@ -18,9 +18,6 @@ class Simulation:
         # simulation params
         self.subroutine = subroutine
         self.runs = runs
-        
-        # sleep time (seconds) between turns to prevent rate limiting
-        self.sleep = 0.1
 
         # simulation components
         self.dataset: Dataset = None
@@ -30,7 +27,7 @@ class Simulation:
 
         # results
         self.run_data: dict[int, RunData] = dict()
-        self.eval_results: dict[int, EvalResult] = dict()
+        self.eval_results: dict[int, list[EvalResult]] = dict()
 
     async def subroutine(self, run_id: int) -> RunData:
         raise NotImplementedError("Simulation subroutine must be defined")
@@ -105,12 +102,13 @@ class Simulation:
         raise NotImplementedError("Simulation export_run_data must be defined")
     
     def export_eval_results(self) -> dict:
-        # {'run_data_hash': [], eval_name': [], 'metadata': [], 'score': [], 'result': []}
         data_obj = {'run_data_hash': [], 'metadata': [], 'evaluations': []}
         for run_id, evals in self.eval_results.items():
             data_obj['run_data_hash'].append(self.run_data[run_id].compute_hash())
-            for evaluation_obj in evals:
-                data_obj['evaluations'].append(evaluation_obj.to_dict())
+            eval_dict = dict()
+            for eval_obj in evals:
+                eval_dict |= eval_obj.to_dict()
+            data_obj['evaluations'].append(eval_dict)
         return data_obj
     
     def push_runs_to_dataset(self, dataset_path: str) -> None:
