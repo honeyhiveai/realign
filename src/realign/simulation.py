@@ -18,6 +18,7 @@ class Simulation:
         # simulation params
         self.subroutine = subroutine
         self.runs = runs
+        self.router_settings = None
 
         # simulation components
         self.dataset: Dataset = None
@@ -64,6 +65,10 @@ class Simulation:
 
     # returns a reference to itself to chain more methods
     def run(self, synthetic_user_builder: SyntheticUserBuilder) -> Self:
+        
+        # set model router settings to the environment
+        if self.router_settings:
+            os.environ["MODEL_ROUTER_SETTINGS"] = json.dumps(self.router_settings)
 
         # load environment variables
         load_dotenv()
@@ -134,15 +139,9 @@ class Simulation:
 
 class ChatSimulation(Simulation):
     '''Responsible for simulating, maintaining, processing states'''
-    
-    def export_run_data(self) -> dict:
-        return_obj = {'inputs': [], 'outputs': [], 'ground_truths': [], 'metadata': []}        
-        for run_id, run_data in self.run_data.items():
-            return_obj['outputs'].append({'messages': [m.__dict__() for m in run_data.final_state]})
-            return_obj['metadata'].append({'run_id': run_id, 'run_data_hash': run_data.compute_hash()})
-        return return_obj
-    
+
     async def chat_simulation_subroutine(self, run_id: int, synth_user_agent: SyntheticUserAgent = None) -> list[OpenAIMessage]:
+        '''Simulates a chat conversation between the app and a synthetic user agent'''
         
         if self.app is None or self.simulator is None:
             raise ValueError("App and simulator agents must be defined")
@@ -175,6 +174,13 @@ class ChatSimulation(Simulation):
             print_chat([messages[-1]])
 
         return messages
+
+    def export_run_data(self) -> dict:
+        return_obj = {'inputs': [], 'outputs': [], 'ground_truths': [], 'metadata': []}        
+        for run_id, run_data in self.run_data.items():
+            return_obj['outputs'].append({'messages': [m.__dict__() for m in run_data.final_state]})
+            return_obj['metadata'].append({'run_id': run_id, 'run_data_hash': run_data.compute_hash()})
+        return return_obj
 
     def __init__(self,
         subroutine: Any = None, 

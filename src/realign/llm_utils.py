@@ -1,12 +1,16 @@
 from realign.types import ModelSettings, OpenAIMessage, RunData, EvalResult
+from realign.router import Router
 from typing import Any
-from litellm import completion, acompletion, aembedding
+from litellm import aembedding
 
 import os
 import json
 import asyncio
 from functools import wraps
 
+
+# initialize the request router
+router = Router()
 
 class bcolors:
     HEADER = '\033[95m'
@@ -85,9 +89,6 @@ def llm_call_get_completion_params(model_settings: ModelSettings, messages: list
     if model_settings.api_key:
         os.getenv(model_settings.api_key)
 
-    # retry params
-    num_retries = 5
-
     # convert messages to dict
     messages_to_llm = [m.__dict__() for m in messages]
     
@@ -97,7 +98,6 @@ def llm_call_get_completion_params(model_settings: ModelSettings, messages: list
         'messages': messages_to_llm,
         'response_format': response_format,
         **hyperparams,
-        'num_retries': num_retries,
     }
     
 def llm_call_post_process_response(model_settings: ModelSettings, messages: list[OpenAIMessage], response: Any) -> Any:
@@ -121,7 +121,7 @@ def llm_messages_call(model_settings: ModelSettings, messages: list[OpenAIMessag
     params = llm_call_get_completion_params(model_settings, messages)
 
     # call the LLM
-    response = completion(**params)
+    response = router.completion(**params)
 
     # post process the response
     message: OpenAIMessage = llm_call_post_process_response(model_settings, messages, response)
@@ -135,7 +135,7 @@ async def allm_messages_call(model_settings: ModelSettings, messages: list[OpenA
     params = llm_call_get_completion_params(model_settings, messages)
 
     # call the LLM
-    response = await acompletion(**params)
+    response = await router.acompletion(**params)
     
     # post process the response
     message: OpenAIMessage = llm_call_post_process_response(model_settings, messages, response)

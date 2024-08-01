@@ -4,7 +4,12 @@ from realign.simulation import ChatSimulation
 from realign.evaluators.llm_evaluators import allm_toxicity_rating, allm_user_engagement
 
 # initialize simulation
-simulation = ChatSimulation(runs=10, max_messages=20)
+simulation = ChatSimulation(runs=3, max_messages=2)
+
+# to ignore rate limiting, uncomment the following line
+# simulation.router_settings = {
+#     '*/*': '*',
+# }
 
 # initialize your app agent
 simulation.app = ChatAgent(system_prompt='''

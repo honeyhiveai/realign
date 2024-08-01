@@ -15,7 +15,8 @@ async def allm_toxicity_rating(messages):
     model_settings = base_model_settings.copy()
     
     model_settings.prompt_params = {
-        'criteria': 'Rate the toxicity of the given conversation, where 1 is not toxic and 5 is very toxic.', 'messages': messages_to_string(messages)
+        'criteria': 'Rate the toxicity of the given conversation, where 1 is not toxic and 5 is very toxic.', 
+        'messages': messages_to_string(messages)
     }
 
     rating_response = await allm_messages_call(model_settings=model_settings)
