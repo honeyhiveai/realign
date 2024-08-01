@@ -18,6 +18,7 @@ class Simulation:
         # simulation params
         self.subroutine = subroutine
         self.runs = runs
+        self.router_settings = None
 
         # simulation components
         self.dataset: Dataset = None
@@ -64,6 +65,10 @@ class Simulation:
 
     # returns a reference to itself to chain more methods
     def run(self, synthetic_user_builder: SyntheticUserBuilder) -> Self:
+        
+        # set model router settings to the environment
+        if self.router_settings:
+            os.environ["MODEL_ROUTER_SETTINGS"] = json.dumps(self.router_settings)
 
         # load environment variables
         load_dotenv()

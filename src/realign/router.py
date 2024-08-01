@@ -1,6 +1,8 @@
 import asyncio
 import time
 import random
+import os
+import json
 
 from litellm import acompletion
 from litellm.exceptions import RateLimitError
@@ -40,7 +42,7 @@ class ModelRouter:
 
         # Add the future and params to the request queue
         await self.request_queue.put((future, params))
-        print(f'{self.model} Queue size: {self.request_queue.qsize()}')
+        # print(f'{self.model} Queue size: {self.request_queue.qsize()}')
         
         # Start processing the queue if it's not already being processed
         if self.processing_task is None or self.processing_task.done():
@@ -77,7 +79,7 @@ class ModelRouter:
                 future.set_result(result)
                 self.request_queue.task_done()
             
-            print(f'{self.model} Processed batch. Queue size: {self.request_queue.qsize()}')
+            # print(f'{self.model} Processed batch. Queue size: {self.request_queue.qsize()}')
 
     async def _wait_for_rate_limit(self, batch_size):
         now = time.time()
@@ -162,21 +164,34 @@ class Router:
     }
 
     def __init__(self, model_router_settings: dict = None):
-        self.model_router_settings = model_router_settings or Router.DEFAULT_SETTINGS
+
+        # load model router settings
+        self.model_router_settings = model_router_settings
         
         # router for each model
         self.model_routers: dict[str, ModelRouter] = dict()
         
     def resolve_model_router_settings(self, model: str):
-        # TODO: Better routing
+        # Load model router settings
+        if self.model_router_settings is not None:
+            pass
+        elif (router_envos := os.getenv('MODEL_ROUTER_SETTINGS')):
+            self.model_router_settings = json.loads(router_envos)
+        else:
+            self.model_router_settings = Router.DEFAULT_SETTINGS
         
-        if model.startswith('openai/'):
-            settings = self.model_router_settings['openai/*']
-        elif model.startswith('groq/'):
-            settings = self.model_router_settings['groq/*']
+        # set the wildcard model router settings to the default max
+        if '*/*' in self.model_router_settings and self.model_router_settings['*/*'] == '*':
+            self.model_router_settings['*/*'] = Router.DEFAULT_SETTINGS['*/*']
+        
+        # TODO: Better routing
+        if model in self.model_router_settings:
+            settings = self.model_router_settings[model]
+        elif (provider := model.split('/')[0]) + '/*' in self.model_router_settings:
+            settings = self.model_router_settings[provider + '/*']
         else:
             settings = self.model_router_settings['*/*']
- 
+        print('Using settings:', settings, 'for model', model)
         return settings
     
     async def acompletion(self, **params):
@@ -190,7 +205,7 @@ class Router:
                                                     settings['batch_size'], 
                                                     settings['requests_per_minute'])
 
-        response =  await self.model_routers[model].acompletion(**params)
+        response = await self.model_routers[model].acompletion(**params)
         return response
     
     def completion(self, **params):
