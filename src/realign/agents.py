@@ -19,7 +19,8 @@ class AbstractAgent:
         self.model_settings: ModelSettings = model_settings
 
     @abstractmethod
-    def process_turn(self, messages: list) -> Optional[Any]:
+    def process_turn(self, state: Any) -> Optional[Any]:
+        '''Process a turn and return the updated state'''
         raise NotImplementedError
     
 class ChatAgent(AbstractAgent):
@@ -101,7 +102,7 @@ class AgentBuilder:
         self.model_settings.system_prompt = self.system_prompt
         self.model_settings.role = self.role
 
-        return ChatAgent(model_settings=self.model_settings, **self.additional_params)
+        return ChatAgent(model_settings=self.model_settings)
 
 class SyntheticUserAgent(ChatAgent):
     
@@ -203,11 +204,6 @@ class SyntheticUserBuilder(AgentBuilder):
 
         return synthetic_user_agent
 
-    async def abuild_many(self, n: int) -> list[SyntheticUserAgent]:
-        # Create n agents concurrently
-        agents = await asyncio.gather(*[self.abuild(persona_idx) for persona_idx in range(n)])
-        return agents
-
     async def abuild(self, persona_idx: int = 0) -> SyntheticUserAgent:
         assert self.retrieved_personas, "Personas must be fetched"
         assert persona_idx < len(self.retrieved_personas), "Persona index out of range"
@@ -248,6 +244,11 @@ class SyntheticUserBuilder(AgentBuilder):
         print('Built synthetic user', persona_idx + 1)
 
         return synthetic_user_agent
+    
+    async def abuild_many(self, n: int) -> list[SyntheticUserAgent]:
+        # Create n agents concurrently
+        agents = await asyncio.gather(*[self.abuild(persona_idx) for persona_idx in range(n)])
+        return agents
 
     def get_persona_generator(self) -> Generator[str, None, None]:
         while True:

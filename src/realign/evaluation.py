@@ -37,7 +37,6 @@ class Evaluation:
         # save the evaluation results
         self.eval_results[run_id] = evals
     
-    
     def __init__(self):
         self.dataset: Dataset = None
         self.evaluators = []
