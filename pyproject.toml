@@ -34,7 +34,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-dev = ["pylint==2.16.2"]
+dev = ["pylint==2.16.2", "pip-tools>=7.4.1"]
 
 [project.urls]
 Documentation = "https://docs.honeyhive.ai/"
