@@ -11,3 +11,5 @@ build/
 TODO.md
 lab
 data
+.aider*
+.vscode

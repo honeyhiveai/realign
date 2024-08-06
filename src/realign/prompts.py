@@ -5,6 +5,8 @@ def resolve_prompt_template(template_name: str):
         return CLASSIFICATION
     elif template_name == 'synthetic_user_prompt_generator':
         return SYNTH_USER_PROMPT_GENERATOR_TEMPLATE
+    elif template_name == 'summary':
+        return SUMMARY
     raise ValueError("Template not found")
 
 
@@ -52,6 +54,22 @@ Please act as an impartial judge and classify the messages provided below. Your 
 '''
 
 
+SUMMARY: str = \
+'''[Instruction]
+
+Summarize this conversation's flow. Be succinct and use short bullet points in the format.
+
+[The Start of Input]
+
+{{messages}}
+
+[The End of Input]
+
+[Response Format]
+Respond ONLY with your generated prompt in the following JSON format: {'summary': SUMMARY}, for example {'summary': 'Here is the summary of the conversation flow: ...'}.
+
+[Summary]
+'''
 
 SYNTH_USER_PROMPT_GENERATOR_TEMPLATE = \
 '''[Instruction]
