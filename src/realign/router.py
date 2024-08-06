@@ -23,8 +23,8 @@ class ModelRouter:
         self.rate_limit_interval = 60 # seconds
         self.last_request_time = time.time() - self.rate_limit_interval 
 
-        # Current queue processing task
-        self.processing_task = None
+        # Continuous queue processing task
+        self.processing_task = asyncio.create_task(self._continuous_process_queue())
         
         # Batch size
         self.batch_size = batch_size
@@ -44,43 +44,44 @@ class ModelRouter:
         # Add the future and params to the request queue
         await self.request_queue.put((future, params))
         # print(f'{self.model} Queue size: {self.request_queue.qsize()}')
-        
-        # Start processing the queue if it's not already being processed
-        if self.processing_task is None or self.processing_task.done():
-            self.processing_task = asyncio.create_task(self._process_queue_in_batches())
 
         return await future
 
+    async def _continuous_process_queue(self):
+        while True:
+            if not self.request_queue.empty():
+                await self._process_queue_in_batches()
+            else:
+                await asyncio.sleep(0.1)  # Small delay to prevent busy-waiting
+
     async def _process_queue_in_batches(self):
-        while not self.request_queue.empty():
-            
-            # halve the batch size if a retry was made in the last batch
-            if self.retry_in_last_batch:
-                self._batch_size = max(self._batch_size // 2, 1)
-                print(f'{self.model} Reduced batch size to {self._batch_size} due to rate limit errors.')
+        # halve the batch size if a retry was made in the last batch
+        if self.retry_in_last_batch:
+            self._batch_size = max(self._batch_size // 2, 1)
+            print(f'{self.model} Reduced batch size to {self._batch_size} due to rate limit errors.')
 
-            self.retry_in_last_batch = False
+        self.retry_in_last_batch = False
 
-            # Get a new batch of requests from the queue
-            batch: list[tuple[asyncio.Future, dict]] = []
-            for _ in range(min(self._batch_size, self.request_queue.qsize())):
-                batch.append(await self.request_queue.get())
-            
-            # Wait for the rate limit to be reset if necessary
-            await self._wait_for_rate_limit(len(batch))
-            
-            # Update the request times
-            await self._update_request_times(len(batch), time.time())
+        # Get a new batch of requests from the queue
+        batch: list[tuple[asyncio.Future, dict]] = []
+        for _ in range(min(self._batch_size, self.request_queue.qsize())):
+            batch.append(await self.request_queue.get())
+        
+        # Wait for the rate limit to be reset if necessary
+        await self._wait_for_rate_limit(len(batch))
+        
+        # Update the request times
+        await self._update_request_times(len(batch), time.time())
 
-            # Make API calls for the batch
-            results: list[ModelResponse] = await asyncio.gather(*[self.safe_api_call(**params) for _, params in batch])
-            
-            # Set the results for each future in the batch
-            for (future, _), result in zip(batch, results):
-                future.set_result(result)
-                self.request_queue.task_done()
-            
-            # print(f'{self.model} Processed batch. Queue size: {self.request_queue.qsize()}')
+        # Make API calls for the batch
+        results: list[ModelResponse] = await asyncio.gather(*[self.safe_api_call(**params) for _, params in batch])
+        
+        # Set the results for each future in the batch
+        for (future, _), result in zip(batch, results):
+            future.set_result(result)
+            self.request_queue.task_done()
+        
+        # print(f'{self.model} Processed batch. Queue size: {self.request_queue.qsize()}')
 
     async def _wait_for_rate_limit(self, batch_size):
         now = time.time()
