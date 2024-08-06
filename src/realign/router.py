@@ -6,6 +6,7 @@ import json
 
 from litellm import acompletion
 from litellm.exceptions import RateLimitError
+from litellm.utils import ModelResponse
 
 class ModelRouter:
 
@@ -61,7 +62,7 @@ class ModelRouter:
             self.retry_in_last_batch = False
 
             # Get a new batch of requests from the queue
-            batch = []
+            batch: list[tuple[asyncio.Future, dict]] = []
             for _ in range(min(self._batch_size, self.request_queue.qsize())):
                 batch.append(await self.request_queue.get())
             
@@ -72,7 +73,7 @@ class ModelRouter:
             await self._update_request_times(len(batch), time.time())
 
             # Make API calls for the batch
-            results = await asyncio.gather(*[self.safe_api_call(**params) for _, params in batch])
+            results: list[ModelResponse] = await asyncio.gather(*[self.safe_api_call(**params) for _, params in batch])
             
             # Set the results for each future in the batch
             for (future, _), result in zip(batch, results):
@@ -104,10 +105,10 @@ class ModelRouter:
         delay = min(self.base_delay * (self.base_multiple ** attempt), self.max_delay)
         return delay
     
-    async def _make_api_call(self, **params):
+    async def _make_api_call(self, **params) -> ModelResponse:
         for attempt in range(self.max_retries):
             try:
-                response = await acompletion(**params)
+                response: ModelResponse = await acompletion(**params)
                 
                 if attempt > 0:
                     print(f'API call for {self.model} succeeded after {attempt} retries!')
@@ -139,7 +140,7 @@ class ModelRouter:
         # This line should never be reached due to the re-raise above, but including for completeness
         raise Exception(f"API call failed after {self.max_retries} retries.")
     
-    async def safe_api_call(self, **params):
+    async def safe_api_call(self, **params) -> ModelResponse:
         try:
             return await self._make_api_call(**params)
         except Exception as e:
