@@ -254,12 +254,6 @@ class SyntheticUserFactory(AgentBuilder):
 
         agents = await asyncio.gather(*[self.abuild(persona_idx) for persona_idx in range(n)])
         return agents
-    
-    def build_many(self, n: int | None = None) -> list[SyntheticUserAgent]:
-        # Create n agents concurrently
-        n = n or self.num_personas
-        agents = asyncio.run(self.abuild_many(n))
-        return agents
 
     def get_persona_generator(self) -> Generator[str, None, None]:
         while True:

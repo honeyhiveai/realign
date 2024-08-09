@@ -25,10 +25,8 @@ class Simulation:
         # results
         self.run_data: dict[int, RunData] = dict()
         self.eval_results: dict[int, list[EvalResult]] = dict()
-        
-        self.setup()
 
-    def setup(self):
+    async def setup(self, runs: int):
         '''Sets up objects used in the simulation'''
 
         # simulation components accessible to the coroutine
@@ -53,7 +51,7 @@ class Simulation:
         # print the eval results
         if self.evaluators and len(self.evaluators) > 0:
 
-            # run the evaluators
+            # run the evaluators  
             eval_tasks = []
             for eval_func in self.evaluators:
                 # pass object reference to the @evaluator decorator
@@ -67,9 +65,28 @@ class Simulation:
 
             print_run_id(run_id)
             print_evals(evals)
+            
+    async def main(self):
+        # set up the simulation
+        await self.setup(runs=self.runs)
+        
+        try:            
+            # Main simulation run task
+            simulation_run_tasks = [
+                self.coroutine_with_evals(run_id)
+                for run_id in range(self.runs)
+            ]
+            
+            # Run tasks in the same loop
+            await asyncio.gather(*simulation_run_tasks)
+
+        finally:
+            # Shut down the router
+            await router.shutdown()
 
     # returns a reference to itself to chain more methods
     def run(self, runs: int = 3) -> Self:
+        '''Runs the main event loop for the simulation'''
         
         # simulation is fundamentally a coroutine that runs N times
         self.runs = self.runs or runs
@@ -81,26 +98,8 @@ class Simulation:
         # load environment variables
         load_dotenv()
         
-        # Create a new event loop
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        try:            
-            # Main simulation run task
-            simulation_run_tasks = [
-                self.coroutine_with_evals(run_id)
-                for run_id in range(self.runs)
-            ]
-            
-            # Run tasks in the same loop
-            loop.run_until_complete(asyncio.gather(*simulation_run_tasks))
-
-        finally:
-            # Shut down the router
-            loop.run_until_complete(router.shutdown())
-
-            # Close the loop
-            loop.close()
+        # start the event loop
+        asyncio.run(self.main())
         
         return self
     
@@ -117,7 +116,7 @@ class Simulation:
             data_obj['evaluations'].append(eval_dict)
         return data_obj
     
-    def push_runs_to_dataset(self, dataset_path: str) -> None:
+    def push_runs_to_dataset(self, dataset_path: str = 'data/run_data.json') -> None:
 
         # if path does not exist, create it
         if not os.path.exists(os.path.dirname(dataset_path)):
@@ -127,7 +126,7 @@ class Simulation:
         with open(dataset_path, 'w') as f:
             json.dump(self.export_run_data(), f, indent=4)
 
-    def push_evals_dataset(self, evaluations_path: str) -> None:
+    def push_evals_dataset(self, evaluations_path: str = 'data/eval_data.json') -> None:
 
         # if path does not exist, create it
         if not os.path.exists(os.path.dirname(evaluations_path)):
@@ -148,14 +147,14 @@ class ChatSimulation(Simulation):
 
         super().__init__()
 
-    def setup(self):
+    async def setup(self, runs: int = 3):
         # simulation components
         self.app: ChatAgent = ChatAgent()
-        self.synthetic_users: list[SyntheticUserAgent] = SyntheticUserFactory() \
+        self.synthetic_users: list[SyntheticUserAgent] = await SyntheticUserFactory() \
                         .as_a('someone who wants help') \
                         .they_want_to('ask a question') \
                         .with_app_objective('answer a question') \
-                        .build_many(self.runs)
+                        .abuild_many(runs)
     
     async def coroutine(self, run_id: int) -> State:
         '''Simulates a chat conversation between the app and a synthetic user agent'''
@@ -192,7 +191,6 @@ class ChatSimulation(Simulation):
             print(chat_str([state.messages[-1]]))
 
         return state
-    
 
     def export_run_data(self) -> dict:
         return_obj = {'inputs': [], 'outputs': [], 'ground_truths': [], 'metadata': []}        

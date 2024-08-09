@@ -43,7 +43,7 @@ class ModelRouter:
 
         # Add the future and params to the request queue
         await self.request_queue.put((future, params))
-        print(f'{self.model} Queue size: {self.request_queue.qsize()}')
+        # print(f'{self.model} Queue size: {self.request_queue.qsize()}')
 
         return await future
 
@@ -51,13 +51,13 @@ class ModelRouter:
         print(f'{self.model} Continuous queue processing task started.')
         while True:
             if not self.request_queue.empty():
-                print(f'{self.model} Processing queue.')
+                # print(f'{self.model} Processing queue.')
                 await self._process_queue_in_batches()
             else:
                 await asyncio.sleep(0.1)  # Small delay to prevent busy-waiting
                 
     async def shutdown(self):
-        print(f'{self.model} Shutting down.')
+        # print(f'{self.model} model router shutting down.')
         self.processing_task.cancel()
         try:
             await self.processing_task
@@ -66,7 +66,7 @@ class ModelRouter:
             pass
 
     async def _process_queue_in_batches(self):
-        print(f'{self.model} Processing queue in batches.')
+        # print(f'{self.model} Processing queue in batches.')
         # halve the batch size if a retry was made in the last batch
         if self.retry_in_last_batch:
             self._batch_size = max(self._batch_size // 2, 1)
@@ -93,7 +93,7 @@ class ModelRouter:
             future.set_result(result)
             self.request_queue.task_done()
         
-        print(f'{self.model} Processed batch. Queue size: {self.request_queue.qsize()}')
+        # print(f'{self.model} Processed batch. Queue size: {self.request_queue.qsize()}')
 
     async def _wait_for_rate_limit(self, batch_size):
         now = time.time()

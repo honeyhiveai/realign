@@ -181,7 +181,6 @@ def llm_messages_call(
 
     return message
 
-
 async def allm_messages_call(
     model_settings: ModelSettings = None, messages: list[OpenAIMessage] = None
 ) -> OpenAIMessage:
@@ -191,7 +190,8 @@ async def allm_messages_call(
     params = llm_call_get_completion_params(model_settings, messages)
 
     # call the LLM
-    response = await acompletion(**params)
+    response = await router.acompletion(**params)
+
     # post process the response
     message: OpenAIMessage = llm_call_post_process_response(
         model_settings, messages, response
