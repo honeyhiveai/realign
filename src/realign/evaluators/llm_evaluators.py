@@ -91,3 +91,19 @@ async def allm_topic_classification(messages, classes: list[str]):
     explanation = rating_response.content.get('explanation', None)
 
     return score, True, explanation
+
+@evaluator
+async def allm_summary(messages):
+    
+    model_settings = base_model_settings.copy()
+    model_settings.template = 'summary'
+    
+    model_settings.prompt_params = {
+        'messages': messages_to_string(messages)
+    }
+
+    summary_response = await allm_messages_call(model_settings=model_settings)
+    
+    score = summary_response.content.get('summary', None)
+    
+    return score, True

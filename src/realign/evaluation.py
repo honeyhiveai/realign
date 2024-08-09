@@ -8,16 +8,16 @@ import json
 
 class Evaluation:
     
-    async def subroutine(self) -> Any:
-        raise NotImplementedError("Evaluation subroutine must be defined")
+    async def coroutine(self) -> Any:
+        raise NotImplementedError("Evaluation coroutine must be defined")
 
-    async def subroutine_with_evals(self, run_id: int, **subroutine_kwargs) -> Any:
+    async def coroutine_with_evals(self, run_id: int, **coroutine_kwargs) -> Any:
         
-        if not self.subroutine:
-            raise ValueError("Simulation subroutine must be defined")
+        if not self.coroutine:
+            raise ValueError("Simulation coroutine must be defined")
 
-        # run the simulation subroutine
-        final_state = await self.subroutine(run_id, **subroutine_kwargs)
+        # run the simulation coroutine
+        final_state = await self.coroutine(run_id, **coroutine_kwargs)
 
         # wrap the simulation run as an object
         sim_run_data = RunData(final_state, run_id=run_id)
@@ -53,7 +53,7 @@ class Evaluation:
         # create an asyncio loop
         loop = asyncio.get_event_loop()
 
-        tasks = [self.subroutine_with_evals(run_id=self.dataset.data['metadata'][i]['run_id']) for i in range(len(self.dataset.data['metadata']))]
+        tasks = [self.coroutine_with_evals(run_id=self.dataset.data['metadata'][i]['run_id']) for i in range(len(self.dataset.data['metadata']))]
 
         loop.run_until_complete(asyncio.gather(*tasks))
         
@@ -135,7 +135,7 @@ class Evaluation:
             json.dump(self.export_eval_results(), f)
 
 class ChatEvaluation(Evaluation):
-    async def chat_evaluation_subroutine(self, run_id: int) -> Any:
+    async def chat_evaluation_coroutine(self, run_id: int) -> Any:
 
         data = self.dataset.data
 
@@ -151,9 +151,9 @@ class ChatEvaluation(Evaluation):
         return datapoint['messages']
         
     
-    def __init__(self, subroutine: Any = None):
+    def __init__(self, coroutine: Any = None):
         
-        if not subroutine:
-            self.subroutine = subroutine = self.chat_evaluation_subroutine
+        if not coroutine:
+            self.coroutine = coroutine = self.chat_evaluation_coroutine
 
         super().__init__()

@@ -43,18 +43,30 @@ class ModelRouter:
 
         # Add the future and params to the request queue
         await self.request_queue.put((future, params))
-        # print(f'{self.model} Queue size: {self.request_queue.qsize()}')
+        print(f'{self.model} Queue size: {self.request_queue.qsize()}')
 
         return await future
 
     async def _continuous_process_queue(self):
+        print(f'{self.model} Continuous queue processing task started.')
         while True:
             if not self.request_queue.empty():
+                print(f'{self.model} Processing queue.')
                 await self._process_queue_in_batches()
             else:
                 await asyncio.sleep(0.1)  # Small delay to prevent busy-waiting
+                
+    async def shutdown(self):
+        print(f'{self.model} Shutting down.')
+        self.processing_task.cancel()
+        try:
+            await self.processing_task
+        except asyncio.CancelledError:
+            # print("Processing task was cancelled successfully.")
+            pass
 
     async def _process_queue_in_batches(self):
+        print(f'{self.model} Processing queue in batches.')
         # halve the batch size if a retry was made in the last batch
         if self.retry_in_last_batch:
             self._batch_size = max(self._batch_size // 2, 1)
@@ -81,7 +93,7 @@ class ModelRouter:
             future.set_result(result)
             self.request_queue.task_done()
         
-        # print(f'{self.model} Processed batch. Queue size: {self.request_queue.qsize()}')
+        print(f'{self.model} Processed batch. Queue size: {self.request_queue.qsize()}')
 
     async def _wait_for_rate_limit(self, batch_size):
         now = time.time()
@@ -173,6 +185,10 @@ class Router:
         # router for each model
         self.model_routers: dict[str, ModelRouter] = dict()
         
+    async def shutdown(self):
+        for model in self.model_routers:
+            await self.model_routers[model].shutdown()
+        
     def resolve_model_router_settings(self, model: str):
         # Load model router settings
         if self.model_router_settings is not None:
@@ -206,6 +222,7 @@ class Router:
             self.model_routers[model] = ModelRouter(model, 
                                                     settings['batch_size'], 
                                                     settings['requests_per_minute'])
+            print(f'Created model router for {model}')
 
         response = await self.model_routers[model].acompletion(**params)
         return response

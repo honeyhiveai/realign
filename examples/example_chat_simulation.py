@@ -1,15 +1,15 @@
 
-from realign.agents import ChatAgent, SyntheticUserBuilder
+from realign.agents import ChatAgent, SyntheticUserFactory
 from realign.simulation import ChatSimulation
-from realign.evaluators.llm_evaluators import allm_toxicity_rating, allm_user_engagement
+from realign.evaluators.llm_evaluators import allm_summary
 
 # initialize simulation
-simulation = ChatSimulation(runs=3, max_messages=2)
+simulation = ChatSimulation(runs=2, max_messages=6)
 
 # to ignore rate limiting, uncomment the following line
-# simulation.router_settings = {
-#     '*/*': '*',
-# }
+simulation.router_settings = {
+    '*/*': '*',
+}
 
 # initialize your app agent
 simulation.app = ChatAgent(system_prompt='''
@@ -19,13 +19,13 @@ simulation.app = ChatAgent(system_prompt='''
 ''', model='openai/gpt-4o-mini')
 
 # initialize your synthetic user agent builder
-simulation.simulator = SyntheticUserBuilder().as_a('undergrad student').they_want_to('learn something new')
+simulation.simulator = SyntheticUserFactory().as_a('someone who wants to learn something new').they_want_to('learn a new complex subject')
 
 # to use a different model for the synthetic user agent
 # simulation.simulator.with_synth_user_model('openai/gpt-4o-mini')
 
 # add evaluators
-simulation.evaluators = [allm_toxicity_rating, allm_user_engagement]
+simulation.evaluators = [allm_summary]
 
 # run simulation
 simulation.run()

@@ -1,16 +1,27 @@
 from realign.types import ModelSettings, OpenAIMessage, RunData, EvalResult
 from realign.router import Router
-from typing import Any
-from litellm import aembedding
+from typing import Any, Optional
+from litellm import aembedding, acompletion
 
 import os
 import json
 import asyncio
 from functools import wraps
+from dataclasses import dataclass
 
 
 # initialize the request router
 router = Router()
+
+@dataclass
+class State:
+    messages: list[OpenAIMessage]
+    
+    def __init__(self):
+        self.messages = []
+        
+    def __repr__(self) -> str:
+        return chat_str(self.messages[1:])
 
 class bcolors:
     HEADER = "\033[95m"
@@ -24,34 +35,37 @@ class bcolors:
     UNDERLINE = "\033[4m"
 
 
-def print_system_prompt(model_settings: ModelSettings):
+def system_prompt_str(model_settings: ModelSettings):
+    string = ''
     if model_settings.role == "user":
-        print(
-            bcolors.HEADER + "\nUSER SYSTEM PROMPT\n\n",
-            model_settings.system_prompt,
-            bcolors.ENDC,
+        string = ' '.join(
+            (bcolors.HEADER + "\nUSER SYSTEM PROMPT\n\n", 
+            model_settings.system_prompt, 
+            bcolors.ENDC)
         )
     elif model_settings.role == "assistant":
-        print(
-            bcolors.HEADER + "\nASSISTANT SYSTEM PROMPT\n\n",
+        string = ' '.join(
+            (bcolors.HEADER + "\nASSISTANT SYSTEM PROMPT\n\n",
             model_settings.system_prompt,
-            bcolors.ENDC,
+            bcolors.ENDC)
         )
+    return string
 
 
-def print_chat(messages: list[OpenAIMessage]):
+def chat_str(messages: list[OpenAIMessage]):
+    string = ''
     for m in messages:
         if m.role == "user":
-            print(
-                bcolors.OKBLUE + "\n", m.role.upper(), "\n\n", m.content, bcolors.ENDC
+            string += '\n' + ' '.join(
+                (bcolors.OKBLUE + "\n", m.role.upper(), "\n\n", m.content, bcolors.ENDC)
             )
         elif m.role == "assistant":
-            print(
-                bcolors.OKGREEN + "\n", m.role.upper(), "\n\n", m.content, bcolors.ENDC
+            string += '\n' + ' '.join(
+                (bcolors.OKGREEN + "\n", m.role.upper(), "\n\n", m.content, bcolors.ENDC)
             )
         elif m.role == "system":
             pass
-
+    return string
 
 def print_run_id(run_id):
     print("-" * 100)
@@ -77,8 +91,17 @@ def swap_roles(messages: list[OpenAIMessage]) -> list[OpenAIMessage]:
 
 
 def llm_call_get_completion_params(
-    model_settings: ModelSettings, messages: list[OpenAIMessage]
+    model_settings: Optional[ModelSettings] = None, 
+    messages: Optional[list[OpenAIMessage]] | None = None
 ) -> dict:
+    
+    # use default settings if not provided
+    if not model_settings:
+        model_settings = ModelSettings(
+            model="openai/gpt-4o-mini",
+            system_prompt="Be a good assistant.",
+            role="assistant",
+        )
 
     # resolve the prompt
     system_prompt = model_settings.resolve_system_prompt()
@@ -141,7 +164,7 @@ def llm_call_post_process_response(
 
 
 def llm_messages_call(
-    model_settings: ModelSettings, messages: list[OpenAIMessage] = []
+    model_settings: Optional[ModelSettings], messages: list[OpenAIMessage] = []
 ) -> OpenAIMessage:
     """Make an LLM call with the messages provided"""
 
@@ -160,7 +183,7 @@ def llm_messages_call(
 
 
 async def allm_messages_call(
-    model_settings: ModelSettings, messages: list[OpenAIMessage] = None
+    model_settings: ModelSettings = None, messages: list[OpenAIMessage] = None
 ) -> OpenAIMessage:
     """Make an LLM call with the messages provided"""
 
@@ -168,8 +191,7 @@ async def allm_messages_call(
     params = llm_call_get_completion_params(model_settings, messages)
 
     # call the LLM
-    response = await router.acompletion(**params)
-
+    response = await acompletion(**params)
     # post process the response
     message: OpenAIMessage = llm_call_post_process_response(
         model_settings, messages, response

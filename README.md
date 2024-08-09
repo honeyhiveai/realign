@@ -63,7 +63,7 @@ A simulation has 3 main steps:
 We first initialize the `ChatSimulation` so and ask it to run 3 conversations of 10 messages each. 
 
 ```python
-from realign.agents import ChatAgent, SyntheticUserBuilder
+from realign.agents import ChatAgent, SyntheticUserFactory
 from realign.simulation import ChatSimulation
 from realign.evaluators.llm_evaluators import allm_toxicity_rating, allm_user_engagement
 
@@ -81,11 +81,11 @@ simulation.app = ChatAgent(system_prompt='''
 ''')
 ```
 
-We then set the simulator which will run your app. In the ChatSimulation case, the simulator is a synthetic user generator. We use the `SyntheticUserBuilder` utility to specify a persona and scenario. Realign leverages 1000 diverse personas to seed each simulated conversation and create diverse scenarios.
+We then set the simulator which will run your app. In the ChatSimulation case, the simulator is a synthetic user generator. We use the `SyntheticUserFactory` utility to specify a persona and scenario. Realign leverages 1000 diverse personas to seed each simulated conversation and create diverse scenarios.
 
 ```python
 # initialize your synthetic user agent builder
-simulation.simulator = SyntheticUserBuilder().as_a('student').they_want_to('learn something new')
+simulation.simulator = SyntheticUserFactory().as_a('student').they_want_to('learn something new')
 														
 # Generates personas whose first chat message is as follows:
 # Hi, I'm Saman, a graduate student at Duke Kunshan University, and I'd love to dive into the world of quantum mechanics starting with an overview of the field.
@@ -119,7 +119,7 @@ simulation.push_evals_dataset('src/realign/data/eval_data.json')
 Here’s the plug-and-play file:
 
 ```python
-from realign.agents import ChatAgent, SyntheticUserBuilder
+from realign.agents import ChatAgent, SyntheticUserFactory
 from realign.simulation import ChatSimulation
 from realign.evaluators.llm_evaluators import allm_toxicity_rating, allm_user_engagement
 
@@ -133,7 +133,7 @@ simulation.app = ChatAgent(system_prompt='''
 ''', model='openai/gpt-4o-mini')
 
 # initialize your synthetic user agent builder
-simulation.simulator = SyntheticUserBuilder().as_a('student').they_want_to('learn something new')
+simulation.simulator = SyntheticUserFactory().as_a('student').they_want_to('learn something new')
 
 # to use a different model for the synthetic user agent
 # simulation.simulator.with_synth_user_model('openai/gpt-4o-mini')
@@ -278,8 +278,8 @@ Dataset tooling is coming soon!
 
 ### What is a Simulation?
 
-- A simulation is a subroutine that runs N times.
-- Within the subroutine, your App agent will interact with the Simulator environment for several turns.
+- A simulation is a coroutine that runs N times.
+- Within the coroutine, your App agent will interact with the Simulator environment for several turns.
 - After the last turn, the Evaluator functions will be run on the final state of the simulation to compute various metrics.
 
 ### Why should I simulate?
@@ -303,11 +303,11 @@ The `state` is an abstract concept that ties together your application, the simu
 
 Your agent likely has external dependencies, such as a human user or a third party API call. All such dependencies must be simulated for your agent to function. The `simulation.simulator` param specifies this simulator.
 
-You might wonder why we pass in a SyntheticUserBuilder instead of a SyntheticUser. This is because the simulator will `yield` a new SyntheticUser each time a subroutine is spawned, and so what we need to pass in is the *synthetic user generator* rather than the actual synthetic user. Here’s how it works:
+You might wonder why we pass in a SyntheticUserFactory instead of a SyntheticUser. This is because the simulator will `yield` a new SyntheticUser each time a coroutine is spawned, and so what we need to pass in is the *synthetic user generator* rather than the actual synthetic user. Here’s how it works:
 
 - Synthetic user builder yields a new persona for every simulation run
-- The SyntheticUserBuilder is initialized using persona and scenario. Each run will have variants of different personas based on what you specify.
-- Realign’s SyntheticUserBuilder leverages 1000 personas specified in the `persona-hub/personas.jsonl` file. For more information, please refer to the [Persona Hub paper.](https://arxiv.org/pdf/2406.20094)
+- The SyntheticUserFactory is initialized using persona and scenario. Each run will have variants of different personas based on what you specify.
+- Realign’s SyntheticUserFactory leverages 1000 personas specified in the `persona-hub/personas.jsonl` file. For more information, please refer to the [Persona Hub paper.](https://arxiv.org/pdf/2406.20094)
 
 
 # Contributing

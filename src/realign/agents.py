@@ -1,6 +1,6 @@
 from realign.types import ModelSettings, OpenAIMessage
 from realign.prompts import resolve_prompt_template
-from realign.llm_utils import llm_messages_call, allm_messages_call
+from realign.llm_utils import llm_messages_call, allm_messages_call, State
 from typing import Optional, Any, Generator
 from abc import abstractmethod
 import json
@@ -26,36 +26,36 @@ class AbstractAgent:
 class ChatAgent(AbstractAgent):
 
     def __init__(self, **model_settings):
-        model_settings = model_settings or {'model_settings': ModelSettings(
-            model='openai/gpt-4o-mini',
-            role='assistant',
-        )}
+        default_model_settings = {
+            'model': 'openai/gpt-4o-mini',
+            'role': 'assistant',
+            'system_prompt': 'Be a friendly assistant. Always respond with a single concise sentence.',
+        }
 
-        super().__init__(**model_settings)
+        if 'model_settings' in model_settings:
+            super().__init__(**model_settings)
+        else:
+            agent_model_settings = {
+                **default_model_settings,
+                **model_settings
+            }
+
+            super().__init__(**agent_model_settings)
         
-    async def aprocess_turn(self, messages: list[OpenAIMessage] = []) -> list[OpenAIMessage]:
+    async def aprocess_turn(self, state: State = State()) -> State:
         '''Process a turn in the conversation'''
-
-        new_message: OpenAIMessage = await allm_messages_call(model_settings=self.model_settings, messages=messages)
+        
+        new_message: OpenAIMessage = await allm_messages_call(model_settings=self.model_settings, messages=state.messages)
 
         new_message.role = self.model_settings.role
         
-        messages.append(new_message)
+        state.messages.append(new_message)
         
         # return the updated state
-        return messages
+        return state
     
-    def process_turn(self, messages: list[OpenAIMessage] = []) -> list[OpenAIMessage]:
-        '''Process a turn in the conversation'''
-
-        new_message: OpenAIMessage = llm_messages_call(model_settings=self.model_settings, messages=messages)
-
-        new_message.role = self.model_settings.role
-        
-        messages.append(new_message)
-        
-        # return the updated state
-        return messages
+    def process_turn(self, state: State = State()) -> list[OpenAIMessage]:
+        return asyncio.run(self.aprocess_turn(state))
 
 class AgentBuilder:
     
@@ -114,7 +114,7 @@ class SyntheticUserAgent(ChatAgent):
         self.role = 'user'
         super().__init__(**model_settings)
 
-class SyntheticUserBuilder(AgentBuilder):
+class SyntheticUserFactory(AgentBuilder):
     
     def __init__(self):
         super().__init__()
@@ -137,23 +137,23 @@ class SyntheticUserBuilder(AgentBuilder):
         
         self.synth_user_model = None
     
-    def as_a(self, persona: str) -> 'SyntheticUserBuilder':
+    def as_a(self, persona: str) -> 'SyntheticUserFactory':
         self.persona = persona
         return self
     
-    def they_want_to(self, scenario: str) -> 'SyntheticUserBuilder':
+    def they_want_to(self, scenario: str) -> 'SyntheticUserFactory':
         self.scenario = scenario
         return self
     
-    def with_app_objective(self, app_objective: str) -> 'SyntheticUserBuilder':
+    def with_app_objective(self, app_objective: str) -> 'SyntheticUserFactory':
         self.synth_user_builder_model_settings.prompt_params['app'] = app_objective
         return self
     
-    def with_system_prompt(self, system_prompt: str) -> 'SyntheticUserBuilder':
+    def with_system_prompt(self, system_prompt: str) -> 'SyntheticUserFactory':
         self.synth_user_system_prompt = system_prompt
         return self
     
-    def fetch_personas(self) -> 'SyntheticUserBuilder':
+    def fetch_personas(self) -> 'SyntheticUserFactory':
         if not self.retrieved_personas or len(self.retrieved_personas) < self.num_personas:
             self.retrieved_personas: list[str] = self.get_personas_from_hub(self.persona)
             self.current_persona_index = 0
@@ -163,7 +163,7 @@ class SyntheticUserBuilder(AgentBuilder):
                 print('-', p)
         return self
     
-    def with_synth_user_model(self, model: str) -> 'SyntheticUserBuilder':
+    def with_synth_user_model(self, model: str) -> 'SyntheticUserFactory':
         self.synth_user_model = model
         return self
     
@@ -226,10 +226,10 @@ class SyntheticUserBuilder(AgentBuilder):
             }
 
             prompt_renderer_agent = ChatAgent(model_settings=settings_copy)
-            messages: list[OpenAIMessage] = await prompt_renderer_agent.aprocess_turn()
-            if len(messages) == 0:
+            state: State = await prompt_renderer_agent.aprocess_turn()
+            if len(state.messages) == 0:
                 raise ValueError("No messages generated")
-            system_prompt = messages[-1].content['synth_user_system_prompt']
+            system_prompt = state.messages[-1].content['synth_user_system_prompt']
         else:
             system_prompt = self.synth_user_system_prompt
             self.synth_user_system_prompt = None
@@ -245,9 +245,20 @@ class SyntheticUserBuilder(AgentBuilder):
 
         return synthetic_user_agent
     
-    async def abuild_many(self, n: int) -> list[SyntheticUserAgent]:
+    async def abuild_many(self, n: int | None = None) -> list[SyntheticUserAgent]:
         # Create n agents concurrently
+        n = n or self.num_personas
+        
+        # Make sure personas are fetched
+        self.fetch_personas()
+
         agents = await asyncio.gather(*[self.abuild(persona_idx) for persona_idx in range(n)])
+        return agents
+    
+    def build_many(self, n: int | None = None) -> list[SyntheticUserAgent]:
+        # Create n agents concurrently
+        n = n or self.num_personas
+        agents = asyncio.run(self.abuild_many(n))
         return agents
 
     def get_persona_generator(self) -> Generator[str, None, None]:
@@ -255,7 +266,7 @@ class SyntheticUserBuilder(AgentBuilder):
             yield self.retrieved_personas[self.current_persona_index]
             self.current_persona_index = (self.current_persona_index + 1) % len(self.retrieved_personas)
     
-    def with_num_personas(self, num_personas: int) -> 'SyntheticUserBuilder':
+    def with_num_personas(self, num_personas: int) -> 'SyntheticUserFactory':
         self.num_personas = num_personas
         return self
 
