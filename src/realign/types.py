@@ -35,7 +35,7 @@ class ModelSettings:
     role: str = 'assistant'
     
     def resolve_response_format(self) -> str:
-        if self.json_mode or self.template:
+        if self.json_mode: 
             return { 'type': "json_object" }
         return None
     

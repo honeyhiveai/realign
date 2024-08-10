@@ -146,6 +146,7 @@ class ModelRouter:
                 delay = self.calculate_delay(attempt) + random.uniform(0, 0.1 * self._batch_size) # Add jitter
                 
                 self.retry_in_last_batch = True
+                print(e)
                 
                 print(f'\nAPI call for model {self.model} failed. Retrying after {delay} seconds (Attempt {attempt + 1}/{self.max_retries})\n')
                 await asyncio.sleep(delay)

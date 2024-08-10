@@ -7,7 +7,7 @@ def resolve_prompt_template(template_name: str):
         return SYNTH_USER_PROMPT_GENERATOR_TEMPLATE
     elif template_name == 'summary':
         return SUMMARY
-    raise ValueError("Template not found")
+    return template_name 
 
 
 RATING_5_STAR: str = \
