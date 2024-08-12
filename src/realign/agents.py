@@ -77,8 +77,8 @@ class AgentBuilder:
         self.model_settings.template = template
         return self
     
-    def with_prompt_params(self, prompt_params: dict[str, str]) -> 'AgentBuilder':
-        self.model_settings.prompt_params = prompt_params
+    def with_template_params(self, template_params: dict[str, str]) -> 'AgentBuilder':
+        self.model_settings.template_params = template_params
         return self
 
     def with_role(self, role: str) -> 'AgentBuilder':
@@ -127,7 +127,7 @@ class SyntheticUserFactory(AgentBuilder):
             model='openai/gpt-4o-mini',
             role='user',
             template='synthetic_user_prompt_generator',
-            prompt_params={},
+            template_params={},
             json_mode=True,
             hyperparams={'temperature': 1},
         )
@@ -146,7 +146,7 @@ class SyntheticUserFactory(AgentBuilder):
         return self
     
     def with_app_objective(self, app_objective: str) -> 'SyntheticUserFactory':
-        self.synth_user_builder_model_settings.prompt_params['app'] = app_objective
+        self.synth_user_builder_model_settings.template_params['app'] = app_objective
         return self
     
     def with_system_prompt(self, system_prompt: str) -> 'SyntheticUserFactory':
@@ -182,8 +182,8 @@ class SyntheticUserFactory(AgentBuilder):
             self.synth_user_builder_model_settings = self.synth_user_builder_model_settings.copy()
         
             # generate the synthetic user prompt
-            self.synth_user_builder_model_settings.prompt_params = {
-                **self.synth_user_builder_model_settings.prompt_params,
+            self.synth_user_builder_model_settings.template_params = {
+                **self.synth_user_builder_model_settings.template_params,
                 'scenario': self.scenario,
                 'persona': next_persona,
             }
@@ -219,8 +219,8 @@ class SyntheticUserFactory(AgentBuilder):
             settings_copy = self.synth_user_builder_model_settings.copy()
         
             # generate the synthetic user prompt
-            settings_copy.prompt_params = {
-                **settings_copy.prompt_params,
+            settings_copy.template_params = {
+                **settings_copy.template_params,
                 'scenario': self.scenario,
                 'persona': next_persona,
             }

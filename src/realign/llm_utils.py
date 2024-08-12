@@ -1,14 +1,14 @@
 from realign.types import ModelSettings, OpenAIMessage, RunData, EvalResult
 from realign.router import Router
+
 from typing import Any, Optional
-from litellm import aembedding, acompletion
+from litellm import ModelResponse, aembedding, acompletion 
 
 import os
 import json
 import asyncio
 from functools import wraps
 from dataclasses import dataclass
-
 
 # initialize the request router
 router = Router()
@@ -92,7 +92,7 @@ def swap_roles(messages: list[OpenAIMessage]) -> list[OpenAIMessage]:
 
 def llm_call_get_completion_params(
     model_settings: Optional[ModelSettings] = None, 
-    messages: Optional[list[OpenAIMessage]] | None = None
+    messages: Optional[list[OpenAIMessage]] | list[dict[str, str]] = None
 ) -> dict:
     
     # use default settings if not provided
@@ -108,8 +108,14 @@ def llm_call_get_completion_params(
 
     # validate the keys
     model_settings.validate_keys()
-
+    
     messages = messages or []
+
+    # ensure that messages is a list of OpenAIMessages
+    for m in messages:
+        if not isinstance(m, OpenAIMessage):
+            m = OpenAIMessage(**m)
+    
     if len(messages) == 0:
         messages = [OpenAIMessage(role="system", content=system_prompt)]
     elif messages[0].role != "system":
@@ -145,7 +151,7 @@ def llm_call_get_completion_params(
 
 
 def llm_call_post_process_response(
-    model_settings: ModelSettings, messages: list[OpenAIMessage], response: Any
+    model_settings: ModelSettings, messages: list[OpenAIMessage], response: ModelResponse
 ) -> Any:
 
     # unswap roles for user
@@ -182,15 +188,16 @@ def llm_messages_call(
     return message
 
 async def allm_messages_call(
-    model_settings: ModelSettings = None, messages: list[OpenAIMessage] = None
+    model_settings: ModelSettings = None, 
+    messages: list[OpenAIMessage] | list[dict[str, str]] = None
 ) -> OpenAIMessage:
-    """Make an LLM call with the messages provided"""
+    """Make an LLM call with provided model_settings and messages"""
 
     # get the params
     params = llm_call_get_completion_params(model_settings, messages)
 
-    # call the LLM
-    response = await router.acompletion(**params)
+    # call the LLM using the router
+    response: ModelResponse = await router.acompletion(**params)
 
     # post process the response
     message: OpenAIMessage = llm_call_post_process_response(

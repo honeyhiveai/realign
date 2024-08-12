@@ -1,13 +1,15 @@
-def resolve_prompt_template(template_name: str):
-    if template_name == 'rating_5_star':
+def resolve_prompt_template(template_name_or_template: str):
+    if template_name_or_template == 'rating_5_star':
         return RATING_5_STAR
-    elif template_name == 'classification':
+    elif template_name_or_template == 'classification':
         return CLASSIFICATION
-    elif template_name == 'synthetic_user_prompt_generator':
+    elif template_name_or_template == 'synthetic_user_prompt_generator':
         return SYNTH_USER_PROMPT_GENERATOR_TEMPLATE
-    elif template_name == 'summary':
+    elif template_name_or_template == 'summary':
         return SUMMARY
-    return template_name 
+    else:
+        # return the template if no match
+        return template_name_or_template
 
 
 RATING_5_STAR: str = \

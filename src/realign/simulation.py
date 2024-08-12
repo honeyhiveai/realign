@@ -66,28 +66,47 @@ class Simulation:
             print_run_id(run_id)
             print_evals(evals)
             
-    async def main(self):
-        # set up the simulation
-        await self.setup(runs=self.runs)
+    async def run_simulation(self):
         
-        try:            
-            # Main simulation run task
+        # start timer
+        start = asyncio.get_event_loop().time()
+        
+        try:
+            
+            await self.setup(runs=self.runs)
+            
             simulation_run_tasks = [
                 self.coroutine_with_evals(run_id)
                 for run_id in range(self.runs)
             ]
             
-            # Run tasks in the same loop
             await asyncio.gather(*simulation_run_tasks)
 
         finally:
-            # Shut down the router
-            await router.shutdown()
+            if router:
+                await router.shutdown()
+                router_stats = router.get_stats()
+            else:
+                router_stats = None
 
-    # returns a reference to itself to chain more methods
+            # end timer
+            end = asyncio.get_event_loop().time()
+
+            print('\n\n' + '-'*100)
+            print('Simulation Stats:')
+            print(f'\tSimulation Duration: {(end - start):.3f} sec')
+            print(f'\tRuns: {self.runs} runs')
+
+            print('-'*100)
+            for model_name, model_stats in router_stats.items():
+                print(f'{model_name} Stats:')
+                print(json.dumps(model_stats, indent=4).replace('"', ''))
+            
+            print('-'*100 + '\n\n')
+
     def run(self, runs: int = 3) -> Self:
         '''Runs the main event loop for the simulation'''
-        
+
         # simulation is fundamentally a coroutine that runs N times
         self.runs = self.runs or runs
         
@@ -98,8 +117,12 @@ class Simulation:
         # load environment variables
         load_dotenv()
         
-        # start the event loop
-        asyncio.run(self.main())
+        try:
+            asyncio.run(self.run_simulation())
+        except KeyboardInterrupt:
+            print("Simulation interrupted by user")
+        except Exception as e:
+            print(f"An error occurred during simulation: {e}")
         
         return self
     
@@ -169,7 +192,7 @@ class ChatSimulation(Simulation):
         print(system_prompt_str(self.app.model_settings))
         print(system_prompt_str(synth_user_agent.model_settings))
         
-        max_messages = self.max_messages
+        max_messages = self.max_messages or 3
         
         state = State()
         if self.first_turn_role == 'user' and max_messages > 0:

@@ -4,11 +4,15 @@ import random
 import os
 import json
 
-from litellm import acompletion
+from litellm import acompletion, token_counter
 from litellm.exceptions import RateLimitError
 from litellm.utils import ModelResponse
 
+from realign.types import OpenAIMessage
+
 class ModelRouter:
+    
+    RETRYABLE_EXCEPTIONS = [RateLimitError, Exception]
 
     def __init__(self, model, batch_size, requests_per_minute):
         # each model has its own router
@@ -36,16 +40,29 @@ class ModelRouter:
         self.base_delay = 1
         self.max_delay = 60
         self.base_multiple = 2
+        
+        # stats
+        self.total_requests = 0
+        self.successful_requests = 0
+        self.failed_requests = 0
+        self.total_retries = 0
+        self.total_cost = 0.0
+        self.total_duration = 0.0
+        self.total_tokens = 0
 
-    async def acompletion(self, **params):
+    async def acompletion(self, **params) -> ModelResponse:
         # Create a future to store the result of the API call
         future = asyncio.Future()
 
         # Add the future and params to the request queue
         await self.request_queue.put((future, params))
         # print(f'{self.model} Queue size: {self.request_queue.qsize()}')
-
+        
         return await future
+    
+    def completion(self, **params):
+        # TODO: implement this without using the acompletion method. 
+        raise NotImplementedError
 
     async def _continuous_process_queue(self):
         print(f'{self.model} Continuous queue processing task started.')
@@ -64,6 +81,23 @@ class ModelRouter:
         except asyncio.CancelledError:
             # print("Processing task was cancelled successfully.")
             pass
+
+    def get_stats(self):
+        return {
+            'Routing Stats': {
+                'Total Requests': self.total_requests,
+                'Successful Requests': self.successful_requests,
+                'Failed Requests': self.failed_requests,
+                'Total Retries': self.total_retries,
+            },
+            'Model Stats (successful requests)': {
+                'Total Tokens': self.total_tokens,
+                'Total Cost': self.total_cost,
+                'Average Tokens per Request': self.total_tokens / self.successful_requests,
+                'Average Cost per Request': self.total_cost / self.successful_requests,
+                'Average Latency per Request': self.total_duration / self.successful_requests,
+            }
+        }
 
     async def _process_queue_in_batches(self):
         # print(f'{self.model} Processing queue in batches.')
@@ -86,7 +120,10 @@ class ModelRouter:
         await self._update_request_times(len(batch), time.time())
 
         # Make API calls for the batch
-        results: list[ModelResponse] = await asyncio.gather(*[self.safe_api_call(**params) for _, params in batch])
+        results: list[ModelResponse] = await asyncio.gather(*[
+            self.safe_api_call(**params) 
+            for _, params in batch
+        ])
         
         # Set the results for each future in the batch
         for (future, _), result in zip(batch, results):
@@ -121,33 +158,56 @@ class ModelRouter:
     async def _make_api_call(self, **params) -> ModelResponse:
         for attempt in range(self.max_retries):
             try:
+                self.total_requests += 1
+                
+                # start the timer
+                start = asyncio.get_event_loop().time()
+
+                # Make the LLM API call
                 response: ModelResponse = await acompletion(**params)
+                
+                # end the timer
+                end = asyncio.get_event_loop().time()
                 
                 if attempt > 0:
                     print(f'API call for {self.model} succeeded after {attempt} retries!')
+                    
+                # update the stats
+                self.successful_requests += 1
+                self.total_retries += attempt
+                self.total_duration += end - start
+                if 'messages' in params:
+                    self.total_tokens += token_counter(model=self.model, messages=params['messages'])
+                self.total_cost += response._hidden_params.get('response_cost', 0)
                 
                 return response
             except RateLimitError as e:
-                if attempt == self.max_retries - 1:
+                if attempt == self.max_retries - 1 or e not in self.RETRYABLE_EXCEPTIONS:
+                    self.failed_requests += 1
+                    self.total_retries += attempt
                     raise  # Re-raise on last attempt
                 
                 # Get the retry-after header from the response, or use the calculated delay
                 delay = float(e.response.headers.get('retry-after', self.calculate_delay(attempt)))
                 delay += random.uniform(0, 0.1 * self._batch_size) # Add jitter
                 
-                self.retry_in_last_batch = True
+                # Set the retry in the last batch                
+                self.retry_in_last_batch = True                
 
                 print(f'RateLimitError encountered for {self.model}. Retrying after {delay:.3f} seconds (Attempt {attempt + 1}/{self.max_retries}). Please increase the requests_per_minute parameter in the model router settings to throttle the rate limit.\n')
                 await asyncio.sleep(delay)
             except Exception as e:
-                if attempt == self.max_retries - 1:
+                if attempt == self.max_retries - 1 or e not in self.RETRYABLE_EXCEPTIONS:
+                    self.failed_requests += 1
+                    self.total_retries += attempt
                     raise  # Re-raise on last attempt
                 
                 delay = self.calculate_delay(attempt) + random.uniform(0, 0.1 * self._batch_size) # Add jitter
                 
                 self.retry_in_last_batch = True
-                print(e)
-                
+                                
+                # print the error message
+                print('Exception encountered:', e)
                 print(f'\nAPI call for model {self.model} failed. Retrying after {delay} seconds (Attempt {attempt + 1}/{self.max_retries})\n')
                 await asyncio.sleep(delay)
         
@@ -185,10 +245,16 @@ class Router:
         
         # router for each model
         self.model_routers: dict[str, ModelRouter] = dict()
-        
+    
     async def shutdown(self):
         for model in self.model_routers:
             await self.model_routers[model].shutdown()
+            
+    def get_stats(self):
+        stats = dict()
+        for model in self.model_routers:
+            stats[model] = self.model_routers[model].get_stats()
+        return stats
         
     def resolve_model_router_settings(self, model: str):
         # Load model router settings
@@ -213,10 +279,10 @@ class Router:
         print('Using settings:', settings, 'for model', model)
         return settings
     
-    async def acompletion(self, **params):
-        assert 'model' in params, 'Model must be provided in the params'
+    async def acompletion(self, **params) -> ModelResponse:
 
         # Create a model router if it doesn't exist
+        assert 'model' in params, 'Model must be provided in the params'
         model: str = params['model']
         if model not in self.model_routers:
             settings = self.resolve_model_router_settings(model)
@@ -225,8 +291,12 @@ class Router:
                                                     settings['requests_per_minute'])
             print(f'Created model router for {model}')
 
-        response = await self.model_routers[model].acompletion(**params)
-        return response
+        model_router: ModelRouter = self.model_routers[model]
+        
+        # Make the Chat Completion call
+        litellm_response: ModelResponse = await model_router.acompletion(**params)
+
+        return litellm_response
     
-    def completion(self, **params):
-        return asyncio.run(self.acompletion(**params))
+    def completion(self, **params) -> ModelResponse:
+        raise NotImplementedError

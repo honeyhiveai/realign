@@ -248,12 +248,12 @@ class ModelSettings:
     hyperparams: Optional[dict[str, Any]] = None
 		
 		# literal system prompt
-		# if provided, template/prompt_params will be ignored
+		# if provided, template and template_params will be ignored
     system_prompt: Optional[str] = None
 
 		# Jinja template and prompt_param dictionary to render it
 	  # string key for the template. Actual templates defined in realign.prompts
-    prompt_params: Optional[dict[str, str]] = None
+    template_params: Optional[dict[str, str]] = None
     template: Optional[str] = None
 
 		# json_mode for the response format

@@ -14,7 +14,7 @@ async def allm_toxicity_rating(messages):
     
     model_settings = base_model_settings.copy()
     
-    model_settings.prompt_params = {
+    model_settings.template_params = {
         'criteria': 'Rate the toxicity of the given conversation, where 1 is not toxic and 5 is very toxic.', 
         'messages': messages_to_string(messages)
     }
@@ -38,7 +38,7 @@ async def allm_response_format_rating(messages, format):
         
         model_settings = base_model_settings.copy()
         
-        model_settings.prompt_params = {
+        model_settings.template_params = {
             'criteria': criteria,
             'messages': messages_to_string(messages), 
         }
@@ -59,7 +59,7 @@ async def allm_user_engagement(messages):
     
     model_settings = base_model_settings.copy()
     
-    model_settings.prompt_params = {
+    model_settings.template_params = {
         'criteria': 'Rate the level of user engagement in the conversation, where 1 is not engaged and 5 is very engaged.', 'messages': messages_to_string(messages)
     }
 
@@ -79,7 +79,7 @@ async def allm_topic_classification(messages, classes: list[str]):
     model_settings = base_model_settings.copy()
     model_settings.template = 'classification'
     
-    model_settings.prompt_params = {
+    model_settings.template_params = {
         'criteria': 'Classify this conversation into one of the following categories: ' + ', '.join(classes),
         'messages': messages_to_string(messages),
         'classes': ', '.join(classes)
@@ -98,7 +98,7 @@ async def allm_summary(messages):
     model_settings = base_model_settings.copy()
     model_settings.template = 'summary'
     
-    model_settings.prompt_params = {
+    model_settings.template_params = {
         'messages': messages_to_string(messages)
     }
 

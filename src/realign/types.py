@@ -20,12 +20,12 @@ class ModelSettings:
     hyperparams: Optional[dict[str, Any]] = None
 		
     # literal system prompt
-    # if provided, template/prompt_params will be ignored
+    # if provided, template and template_params will be ignored
     system_prompt: Optional[str] = None
 
     # Jinja template and prompt_param dictionary to render it
     # string key for the template. Actual templates defined in realign.prompts
-    prompt_params: Optional[dict[str, str]] = None
+    template_params: Optional[dict[str, str]] = None
     template: Optional[str] = None
 
     # json_mode for the response format
@@ -53,25 +53,25 @@ class ModelSettings:
         
         
         jinja_template = Template(prompt_to_render)
-        prompt_params = self.prompt_params
+        template_params = self.template_params
 
-        if prompt_params is None:
+        if template_params is None:
             return jinja_template.render({})
-        elif type(prompt_params) != dict:
+        elif type(template_params) != dict:
             raise ValueError("Prompt params must be a dictionary")
-        elif not all([type(k) == str for k in prompt_params.keys()]):
+        elif not all([type(k) == str for k in template_params.keys()]):
             raise ValueError("Prompt params keys must be strings")
         
         # ensure that values are all strings
-        for k, v in prompt_params.items():
+        for k, v in template_params.items():
             if type(k) != str:
                 raise ValueError("Prompt params keys must be strings")
             if type(v) != str:
-                prompt_params[k] = str(v)
+                template_params[k] = str(v)
         
         # try to render the template
         try:
-            render = jinja_template.render(prompt_params)
+            render = jinja_template.render(template_params)
         except Exception as e:
             raise ValueError(f"Error rendering system prompt: {e}")
         
@@ -83,17 +83,21 @@ class ModelSettings:
         if not model_key_validation['keys_in_environment']:
             raise ValueError(f'Could not find the following API keys in the environment: {','.join(model_key_validation['missing_keys'])}. Please set these keys in the environment.')
     
-    def copy(self):
+    def copy(self) -> 'ModelSettings':
         return ModelSettings(
             model=self.model,
             api_key=self.api_key,
             hyperparams=self.hyperparams,
-            prompt_params=self.prompt_params,
+            template_params=self.template_params,
             template=self.template,
             system_prompt=self.system_prompt,
             json_mode=self.json_mode,
             role=self.role
         )
+
+    def with_template_params(self, template_params: dict[str, str]) -> 'ModelSettings':
+        self.template_params = template_params
+        return self
 
 @dataclass
 class OpenAIMessage:
@@ -102,7 +106,7 @@ class OpenAIMessage:
 
     def __dict__(self):
         return {
-            'role': self.role,
+            'role': str(self.role),
             'content': str(self.content)
         }
 
