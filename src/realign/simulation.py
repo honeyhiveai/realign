@@ -1,7 +1,7 @@
 from realign.datasets import Dataset, ChatDataset
 from realign.evaluation import EvalResult
 from realign.types import RunData, OpenAIMessage
-from realign.llm_utils import router, State, system_prompt_str, chat_str, print_run_id, print_evals
+from realign.llm_utils import router, State, system_prompt_str, str_msgs, print_run_id, print_evals
 from realign.agents import AbstractAgent, AgentBuilder, SyntheticUserFactory, SyntheticUserAgent, ChatAgent
 
 from typing import Any, Self, Callable, Coroutine
@@ -9,6 +9,7 @@ import asyncio
 from dotenv import load_dotenv
 import json
 import os
+import inspect
 
 class Simulation:
     # TODO: make synthetic user builder thread safe
@@ -40,7 +41,10 @@ class Simulation:
     async def coroutine_with_evals(self, run_id: int) -> Any:
 
         # run the simulation coroutine
-        final_state = await self.coroutine(run_id)
+        if inspect.getfullargspec(self.coroutine).args == ['self']:
+            final_state = await self.coroutine()
+        else:
+            final_state = await self.coroutine(run_id)
 
         # wrap the simulation run as an object
         sim_run_data = RunData(final_state, run_id=run_id)
@@ -73,7 +77,11 @@ class Simulation:
         
         try:
             
-            await self.setup(runs=self.runs)
+            # call setup
+            if inspect.getfullargspec(self.setup).args == ['self']:
+                await self.setup()
+            else:
+                await self.setup(runs=self.runs)
             
             simulation_run_tasks = [
                 self.coroutine_with_evals(run_id)
@@ -123,6 +131,7 @@ class Simulation:
             print("Simulation interrupted by user")
         except Exception as e:
             print(f"An error occurred during simulation: {e}")
+            raise
         
         return self
     
@@ -198,27 +207,28 @@ class ChatSimulation(Simulation):
         if self.first_turn_role == 'user' and max_messages > 0:
             state = await synth_user_agent.aprocess_turn(state)
             print_run_id(run_id)
-            print(chat_str([state.messages[-1]]))
+            print(str_msgs([state.messages[-1]]))
 
         while True:
             # app turn
             if len(state.messages) > max_messages: break
             state = await self.app.aprocess_turn(state)
             print_run_id(run_id)
-            print(chat_str([state.messages[-1]]))
+            print(str_msgs([state.messages[-1]]))
 
             # synthetic user turn
             if len(state.messages) > max_messages: break
             state = await synth_user_agent.aprocess_turn(state)
             print_run_id(run_id)
-            print(chat_str([state.messages[-1]]))
+            print(str_msgs([state.messages[-1]]))
 
         return state
 
     def export_run_data(self) -> dict:
         return_obj = {'inputs': [], 'outputs': [], 'ground_truths': [], 'metadata': []}        
         for run_id, run_data in self.run_data.items():
-            state: State = run_data.final_state
-            return_obj['outputs'].append({'messages': [m.__dict__() for m in state.messages]})
-            return_obj['metadata'].append({'run_id': run_id, 'run_data_hash': run_data.compute_hash()})
+            state: State | None = run_data.final_state
+            if state:
+                return_obj['outputs'].append({'messages': [m.__dict__() for m in state.messages]})
+                return_obj['metadata'].append({'run_id': run_id, 'run_data_hash': run_data.compute_hash()})
         return return_obj

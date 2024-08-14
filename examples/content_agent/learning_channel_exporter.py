@@ -6,8 +6,8 @@ import json
 from datetime import datetime
 
 # Slack configuration
-SLACK_API_TOKEN = 'SLACK_API_TOKEN'
-SLACK_CHANNEL = 'SLACK_CHANNEL_ID'  # Replace with your desired channel ID
+SLACK_API_TOKEN = os.getenv('SLACK_API_TOKEN')
+SLACK_CHANNEL = 'C03LATH1D28'  # Replace with your desired channel ID
 
 # Slack API endpoint
 SLACK_API_URL = 'https://slack.com/api/conversations.history'
@@ -17,6 +17,11 @@ headers = {
     'Authorization': f'Bearer {SLACK_API_TOKEN}',
     'Content-Type': 'application/json'
 }
+
+# get current working directory
+cwd = os.path.join(os.getcwd(), 'examples', 'content_agent')
+BASE_CONTENT_REPO = os.path.join(cwd, 'base_content_repo.csv')
+
 
 # Function to extract links from message
 def extract_links(message):
@@ -41,7 +46,7 @@ def fetch_and_write_messages():
         # Read existing entries
         existing_entries = set()
         try:
-            with open('base_content_repo.csv', 'r', newline='', encoding='utf-8') as file:
+            with open(BASE_CONTENT_REPO, 'r', newline='', encoding='utf-8') as file:
                 reader = csv.reader(file)
                 next(reader)  # Skip header
                 for row in reader:
@@ -66,7 +71,7 @@ def fetch_and_write_messages():
         messages = data['messages']
 
         # Open CSV file for writing
-        with open('base_content_repo.csv', 'a', newline='', encoding='utf-8') as file:
+        with open(BASE_CONTENT_REPO, 'a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
             
             # Write header if file is empty

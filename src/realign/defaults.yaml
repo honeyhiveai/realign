@@ -1,0 +1,39 @@
+
+llm_agents:
+  default: &basic_model_settings
+    model: openai/gpt-4o-mini
+    system_prompt: |
+      What's the capital of France?
+
+evaluators:
+  pymean:
+    weight: 1.0
+    asserts: off
+
+  npmean:
+    weight: 1.0
+    asserts: off
+    
+  numrange:
+    weight: 1.0
+    asserts: on
+
+  fourtytwo:
+    weight: 1.0
+    asserts: off
+
+  custom_eval:
+    weight: 1.0
+    repeat: 3
+    asserts: off
+    transform: insert_noise(result) # result is between 3 and 7
+    aggregate: pymean(results)
+    checker: numrange
+    target: [3, 5]
+
+  composite:
+    weight: 1.0
+    asserts: off
+    aggregate: weighted_mean(*results)
+
+    

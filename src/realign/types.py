@@ -1,103 +1,24 @@
-from realign.prompts import resolve_prompt_template
-
-from dataclasses import dataclass
-from litellm import validate_environment
-from typing import Any, Optional
 import json
 import hashlib
-from jinja2 import Template
+import operator
+import inspect
+import functools
+from typing import Any, Optional, Callable
+from dataclasses import dataclass
 
-@dataclass
-class ModelSettings:
-    # litellm model name. Refer to https://docs.litellm.ai/docs/providers.
-    model: str 
-    
-    # API key env variable name. 
-    # If not provided, defaults to <MODEL_PROVIDER>_API_KEY format
-    api_key: Optional[str] = None
-    
-    # hyperparam dictionary in OpenAI format, eg. { 'temperature': 0.8 }
-    hyperparams: Optional[dict[str, Any]] = None
-		
-    # literal system prompt
-    # if provided, template and template_params will be ignored
-    system_prompt: Optional[str] = None
+from realign.config import EvalSettings, EVALUATOR_SETTINGS_KEYS
 
-    # Jinja template and prompt_param dictionary to render it
-    # string key for the template. Actual templates defined in realign.prompts
-    template_params: Optional[dict[str, str]] = None
-    template: Optional[str] = None
+class bcolors:
+    HEADER = "\033[95m"
+    OKBLUE = "\033[94m"
+    OKCYAN = "\033[96m"
+    OKGREEN = "\033[92m"
+    WARNING = "\033[93m"
+    FAIL = "\033[91m"
+    ENDC = "\033[0m"
+    BOLD = "\033[1m"
+    UNDERLINE = "\033[4m"
 
-    # json_mode for the response format
-    json_mode: Optional[bool] = False
-    
-    # user or assistant
-    role: str = 'assistant'
-    
-    def resolve_response_format(self) -> str:
-        if self.json_mode: 
-            return { 'type': "json_object" }
-        return None
-    
-    def resolve_system_prompt(self) -> str:
-        prompt_to_render = ''
-        system_prompt = self.system_prompt
-        template = self.template
-        if system_prompt == None:
-            if template == None:
-                raise ValueError("Either system_prompt or template must be provided in the model settings")
-            else:
-                prompt_to_render = resolve_prompt_template(template)
-        else:
-            prompt_to_render = system_prompt
-        
-        
-        jinja_template = Template(prompt_to_render)
-        template_params = self.template_params
-
-        if template_params is None:
-            return jinja_template.render({})
-        elif type(template_params) != dict:
-            raise ValueError("Prompt params must be a dictionary")
-        elif not all([type(k) == str for k in template_params.keys()]):
-            raise ValueError("Prompt params keys must be strings")
-        
-        # ensure that values are all strings
-        for k, v in template_params.items():
-            if type(k) != str:
-                raise ValueError("Prompt params keys must be strings")
-            if type(v) != str:
-                template_params[k] = str(v)
-        
-        # try to render the template
-        try:
-            render = jinja_template.render(template_params)
-        except Exception as e:
-            raise ValueError(f"Error rendering system prompt: {e}")
-        
-        return render
-    
-    def validate_keys(self):
-        # validate that the API keys are set
-        model_key_validation = validate_environment(self.model)
-        if not model_key_validation['keys_in_environment']:
-            raise ValueError(f'Could not find the following API keys in the environment: {','.join(model_key_validation['missing_keys'])}. Please set these keys in the environment.')
-    
-    def copy(self) -> 'ModelSettings':
-        return ModelSettings(
-            model=self.model,
-            api_key=self.api_key,
-            hyperparams=self.hyperparams,
-            template_params=self.template_params,
-            template=self.template,
-            system_prompt=self.system_prompt,
-            json_mode=self.json_mode,
-            role=self.role
-        )
-
-    def with_template_params(self, template_params: dict[str, str]) -> 'ModelSettings':
-        self.template_params = template_params
-        return self
 
 @dataclass
 class OpenAIMessage:
@@ -145,48 +66,143 @@ class RunData:
         return hash_object.hexdigest()    
 
 
-# this object contains a single score
-# the score can be of any type, including a list of scores
 class EvalResult:
-    def __init__(self, 
-                 score: Any, result: bool | None, 
-                 explanation: str | None = None, 
-                 embedding = None,
-                 run_data: RunData = None, 
-                 eval_name: str | None = None, 
-                 repeat: int = 1):
-        self.score = score
-        self.result = result
-        self.explanation = explanation
-        self.embedding = embedding
-        self.run_data = run_data
-        self.eval_name = eval_name
-        self.repeat = repeat
+    
+    def __init__(self, score, init_method=None, **metadata):
+        self.score: Any | EvalResult = score
+        self.metadata: dict = metadata
+        
+        # determine the eval_type
+        self.init_method = init_method or inspect.stack()[1].function
+        
+        self.eval_settings: Optional[EvalSettings] = EvalSettings(type=self.init_method)
+        self.eval_kwargs: Optional[dict] = dict()
+        
+        self.weight = self.eval_settings.weight
+        
+        self.str = self.trace()
+    
+    def trace(self, indent=0):
+        if self.init_method in ['apply_transformation', 'apply_aggregation']:
+            method_color = bcolors.OKBLUE
+        else:
+            method_color = bcolors.WARNING
 
-    def __repr__(self):
-        # get the object id of the run_data
-        run_data_id = id(self.run_data) if self.run_data else None
-        return f'eval_name:   {self.eval_name}\n' + \
-               f'score:       {self.score}\n' + \
-               f'result:      {self.result}\n' + \
-               f'explanation: {self.explanation}\n'
+        result = f'{method_color}{self.init_method}{bcolors.ENDC}:\n'
+        result += f'{" " * (indent + 4)}score: {bcolors.FAIL}{self.score}{bcolors.ENDC}\n'
+        
+        if self.eval_settings:
+            result += f'{" " * (indent + 4)}eval_settings:\n'
+            for key in EVALUATOR_SETTINGS_KEYS:
+                if hasattr(self.eval_settings, key) and getattr(self.eval_settings, key) is not None:
+                    result += f'{" " * (indent + 8)}{key}: {getattr(self.eval_settings, key)}\n'
+        
+        if self.eval_kwargs:
+            result += f'{" " * (indent + 4)}eval_kwargs:\n'
+            for key, value in self.eval_kwargs.items():
+                if value is not None:
+                    result += f'{" " * (indent + 8)}{key}: {value}\n'
+        
+        if self.metadata:
+            result += f'\n{" " * (indent + 4)}metadata:'
+            first_item = True
+            for key, value in self.metadata.items():
+                if not first_item:
+                    result += ','
+                result += f'\n{" " * (indent + 8)}'
+                if key in ('prev_result', 'prev_results'):
+                    if isinstance(value, EvalResult):
+                        result += value.trace(indent + 8)
+                    elif isinstance(value, tuple) or isinstance(value, list):
+                        result += '['
+                        for _, item in enumerate(value):
+                            if isinstance(item, EvalResult):
+                                result += f'\n{" " * (indent + 12)}{item.trace(indent + 12)}'
+                            else:
+                                result += f'\n{" " * (indent + 12)}{item}'
+                        result += f'\n{" " * (indent + 8)}]'
+                    else:
+                        result += str(value)
+                else:
+                    result += str(value)
+                first_item = False
+            result += f'\n{" " * (indent + 4)}'
+        
+        return result
     
-    def __str__(self):
-        return self.__repr__()
-    
-    def unpack(self):
-        if self.explanation:
-            return self.score, self.result, self.explanation
-        return self.score, self.result
-    
-    def __dict__(self):
-        return {
-            self.eval_name: {
-                'score': self.score,
-                'result': self.result,
-                'explanation': self.explanation,
-            }
-        }
-    
-    def to_dict(self) -> dict:
-        return self.__dict__()
+    def __bool__(self) -> bool:
+        return bool(self.score)
+
+    def _operation(self, other: Any, op: Callable) -> 'EvalResult':
+        if isinstance(other, EvalResult):
+            other = other.score
+
+        return EvalResult(op(self.score, other), 
+                              init_method=self.init_method, 
+                              **self.metadata)
+
+    def _r_operation(self, other: Any, op: Callable) -> 'EvalResult':
+        return EvalResult(op(other, self.score), 
+                          init_method=self.init_method,
+                          **self.metadata)
+
+    __add__ = __radd__ = lambda self, other: self._operation(other, operator.add)
+    __sub__ = lambda self, other: self._operation(other, operator.sub)
+    __rsub__ = lambda self, other: self._r_operation(other, operator.sub)
+    __mul__ = __rmul__ = lambda self, other: self._operation(other, operator.mul)
+    __truediv__ = lambda self, other: self._operation(other, operator.truediv)
+    __rtruediv__ = lambda self, other: self._r_operation(other, operator.truediv)
+    __floordiv__ = lambda self, other: self._operation(other, operator.floordiv)
+    __rfloordiv__ = lambda self, other: self._r_operation(other, operator.floordiv)
+    __mod__ = lambda self, other: self._operation(other, operator.mod)
+    __rmod__ = lambda self, other: self._r_operation(other, operator.mod)
+    __pow__ = lambda self, other: self._operation(other, operator.pow)
+    __rpow__ = lambda self, other: self._r_operation(other, operator.pow)
+
+    __neg__ = lambda self: EvalResult(-self.score, 
+                                      init_method=self.init_method, **self.metadata)
+    __pos__ = lambda self: EvalResult(+self.score, 
+                                      init_method=self.init_method,
+                                      **self.metadata)
+    __abs__ = lambda self: EvalResult(abs(self.score), 
+                                      init_method=self.init_method,
+                                      **self.metadata)
+
+    def __int__(self) -> int:
+        return int(self.score)
+
+    def __float__(self) -> float:
+        return float(self.score)
+
+    def __repr__(self) -> str:
+        return f"{self.score}"
+
+    def __eq__(self, other: Any) -> bool:
+        return self.score == (other.score if isinstance(other, EvalResult) else other)
+
+    def __lt__(self, other: Any) -> bool:
+        return self.score < (other.score if isinstance(other, EvalResult) else other)
+
+    __le__ = lambda self, other: self < other or self == other
+    __gt__ = lambda self, other: not (self <= other)
+    __ge__ = lambda self, other: not (self < other)
+
+
+def evaluator(func: Callable) -> Callable:
+    @functools.wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> EvalResult:
+        result = func(*args, **kwargs)
+        if isinstance(result, tuple) and len(result) == 2 and isinstance(result[1], dict):
+            return EvalResult(result[0], init_method=func.__name__, **result[1])
+        return EvalResult(result, init_method=func.__name__)
+
+    @functools.wraps(func)
+    async def async_wrapper(*args: Any, **kwargs: Any) -> EvalResult:
+        result = await func(*args, **kwargs)
+        if isinstance(result, tuple) and len(result) == 2 and isinstance(result[1], dict):
+            return EvalResult(result[0], init_method=func.__name__, **result[1])
+        return EvalResult(result, init_method=func.__name__)
+
+    if inspect.iscoroutinefunction(func):
+        return async_wrapper
+    return wrapper

@@ -3,16 +3,17 @@ import time
 import random
 import os
 import json
+from typing import Optional
 
 from litellm import acompletion, token_counter
-from litellm.exceptions import RateLimitError
+from litellm.exceptions import RateLimitError, APIConnectionError, BadRequestError
 from litellm.utils import ModelResponse
 
 from realign.types import OpenAIMessage
 
 class ModelRouter:
     
-    RETRYABLE_EXCEPTIONS = [RateLimitError, Exception]
+    RETRIABLE_EXCEPTIONS = [RateLimitError, APIConnectionError, Exception]
 
     def __init__(self, model, batch_size, requests_per_minute):
         # each model has its own router
@@ -65,7 +66,7 @@ class ModelRouter:
         raise NotImplementedError
 
     async def _continuous_process_queue(self):
-        print(f'{self.model} Continuous queue processing task started.')
+        print(f'{self.model} Processing requests...')
         while True:
             if not self.request_queue.empty():
                 # print(f'{self.model} Processing queue.')
@@ -92,10 +93,10 @@ class ModelRouter:
             },
             'Model Stats (successful requests)': {
                 'Total Tokens': self.total_tokens,
-                'Total Cost': self.total_cost,
-                'Average Tokens per Request': self.total_tokens / self.successful_requests,
-                'Average Cost per Request': self.total_cost / self.successful_requests,
-                'Average Latency per Request': self.total_duration / self.successful_requests,
+                'Total Cost': "$ " + str(round(self.total_cost, 3)),
+                'Average Tokens per Request': str(round((self.total_tokens / self.successful_requests) if self.successful_requests > 0 else 0, 3)) + " tokens",
+                'Average Cost per Request': "$ " + str(round((self.total_cost / self.successful_requests) if self.successful_requests > 0 else 0, 3)),
+                'Average Latency per Request': str(round((self.total_duration / self.successful_requests) if self.successful_requests > 0 else 0, 3)) + " sec",
             }
         }
 
@@ -120,10 +121,13 @@ class ModelRouter:
         await self._update_request_times(len(batch), time.time())
 
         # Make API calls for the batch
-        results: list[ModelResponse] = await asyncio.gather(*[
-            self.safe_api_call(**params) 
-            for _, params in batch
-        ])
+        results: list[ModelResponse | Exception] = await asyncio.gather(
+            *[
+                self.make_api_call(**params) 
+                for _, params in batch
+            ],
+            return_exceptions=True
+        )
         
         # Set the results for each future in the batch
         for (future, _), result in zip(batch, results):
@@ -155,7 +159,23 @@ class ModelRouter:
         delay = min(self.base_delay * (self.base_multiple ** attempt), self.max_delay)
         return delay
     
-    async def _make_api_call(self, **params) -> ModelResponse:
+    async def make_api_call(self, **params) -> Optional[ModelResponse]:
+        
+        def raise_or_continue(attempt, e):
+            if e not in self.RETRIABLE_EXCEPTIONS:
+                self.failed_requests += 1
+                self.total_retries += attempt
+                print(f'API call for model {self.model} failed. Exception of class {e.__class__} is not retriable: {str(e)}')
+                raise # Re-raise on non-retriable exceptions
+            elif attempt == self.max_retries - 1:
+                self.failed_requests += 1
+                self.total_retries += attempt
+                print(f'API call for model {self.model} failed after {attempt + 1} retries: {str(e)}')
+                raise  # Re-raise on last attempt
+            else:
+                # continue and retry
+                pass
+        
         for attempt in range(self.max_retries):
             try:
                 self.total_requests += 1
@@ -164,7 +184,10 @@ class ModelRouter:
                 start = asyncio.get_event_loop().time()
 
                 # Make the LLM API call
-                response: ModelResponse = await acompletion(**params)
+                response: Optional[ModelResponse] = await acompletion(**params)
+                
+                if response is None:
+                    raise Exception(f'API call for {self.model} failed: {response}')
                 
                 # end the timer
                 end = asyncio.get_event_loop().time()
@@ -180,12 +203,15 @@ class ModelRouter:
                     self.total_tokens += token_counter(model=self.model, messages=params['messages'])
                 self.total_cost += response._hidden_params.get('response_cost', 0)
                 
+                print(f'Successfully called {self.model} in {end - start:.3f} seconds.')
                 return response
+            
+            except BadRequestError as e:
+                # BadRequestError is not retriable
+                raise_or_continue(attempt, e)
+                
             except RateLimitError as e:
-                if attempt == self.max_retries - 1 or e not in self.RETRYABLE_EXCEPTIONS:
-                    self.failed_requests += 1
-                    self.total_retries += attempt
-                    raise  # Re-raise on last attempt
+                raise_or_continue(attempt, e)
                 
                 # Get the retry-after header from the response, or use the calculated delay
                 delay = float(e.response.headers.get('retry-after', self.calculate_delay(attempt)))
@@ -196,11 +222,20 @@ class ModelRouter:
 
                 print(f'RateLimitError encountered for {self.model}. Retrying after {delay:.3f} seconds (Attempt {attempt + 1}/{self.max_retries}). Please increase the requests_per_minute parameter in the model router settings to throttle the rate limit.\n')
                 await asyncio.sleep(delay)
+                
+            except APIConnectionError as e:
+                raise_or_continue(attempt, e)
+
+                delay = self.calculate_delay(attempt) + random.uniform(0, 0.1 * self._batch_size) # Add jitter
+                
+                self.retry_in_last_batch = True
+                
+                # print the error message
+                print(f'APIConnectionError encountered for {self.model}. Retrying after {delay:.3f} seconds (Attempt {attempt + 1}/{self.max_retries})\n')
+                await asyncio.sleep(delay)
+                
             except Exception as e:
-                if attempt == self.max_retries - 1 or e not in self.RETRYABLE_EXCEPTIONS:
-                    self.failed_requests += 1
-                    self.total_retries += attempt
-                    raise  # Re-raise on last attempt
+                raise_or_continue(attempt, e)
                 
                 delay = self.calculate_delay(attempt) + random.uniform(0, 0.1 * self._batch_size) # Add jitter
                 
@@ -212,14 +247,7 @@ class ModelRouter:
                 await asyncio.sleep(delay)
         
         # This line should never be reached due to the re-raise above, but including for completeness
-        raise Exception(f"API call failed after {self.max_retries} retries.")
-    
-    async def safe_api_call(self, **params) -> ModelResponse:
-        try:
-            return await self._make_api_call(**params)
-        except Exception as e:
-            print(f'API call for model {self.model} failed after {self.max_retries} retries: {str(e)}')
-            return None
+        raise Exception(f"API call failed after {self.max_retries} retries. Please reach out to our team.")
 
 class Router:
     

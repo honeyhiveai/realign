@@ -1,14 +1,18 @@
-from realign.types import ModelSettings, OpenAIMessage, RunData, EvalResult
-from realign.router import Router
-
-from typing import Any, Optional
-from litellm import ModelResponse, aembedding, acompletion 
-
 import os
 import json
 import asyncio
-from functools import wraps
 from dataclasses import dataclass
+
+from typing import Any, Optional
+from litellm import ModelResponse, aembedding, acompletion
+import litellm
+
+from realign.types import OpenAIMessage, RunData, EvalResult, bcolors
+from realign.router import Router
+from realign.config import get_model_settings, ModelSettings
+
+# this flag helps litellm modify params to ensure that model-specific requirements are met
+litellm.modify_params = True
 
 # initialize the request router
 router = Router()
@@ -21,18 +25,7 @@ class State:
         self.messages = []
         
     def __repr__(self) -> str:
-        return chat_str(self.messages[1:])
-
-class bcolors:
-    HEADER = "\033[95m"
-    OKBLUE = "\033[94m"
-    OKCYAN = "\033[96m"
-    OKGREEN = "\033[92m"
-    WARNING = "\033[93m"
-    FAIL = "\033[91m"
-    ENDC = "\033[0m"
-    BOLD = "\033[1m"
-    UNDERLINE = "\033[4m"
+        return str_msgs(self.messages[1:])
 
 
 def system_prompt_str(model_settings: ModelSettings):
@@ -51,8 +44,7 @@ def system_prompt_str(model_settings: ModelSettings):
         )
     return string
 
-
-def chat_str(messages: list[OpenAIMessage]):
+def str_msgs(messages: list[OpenAIMessage]):
     string = ''
     for m in messages:
         if m.role == "user":
@@ -89,32 +81,21 @@ def swap_roles(messages: list[OpenAIMessage]) -> list[OpenAIMessage]:
             message.role = "user"
     return messages
 
-
 def llm_call_get_completion_params(
-    model_settings: Optional[ModelSettings] = None, 
-    messages: Optional[list[OpenAIMessage]] | list[dict[str, str]] = None
+    model_settings: Optional[ModelSettings | dict[str, Any]] = None, 
+    messages: Optional[list[OpenAIMessage]] = None
 ) -> dict:
     
-    # use default settings if not provided
-    if not model_settings:
-        model_settings = ModelSettings(
-            model="openai/gpt-4o-mini",
-            system_prompt="Be a good assistant.",
-            role="assistant",
-        )
+    # ensure that messages is a list of OpenAIMessages
+    for i, m in enumerate(messages or []):
+        if not isinstance(m, OpenAIMessage):
+            messages[i] = OpenAIMessage(**m)
 
     # resolve the prompt
     system_prompt = model_settings.resolve_system_prompt()
 
     # validate the keys
     model_settings.validate_keys()
-    
-    messages = messages or []
-
-    # ensure that messages is a list of OpenAIMessages
-    for m in messages:
-        if not isinstance(m, OpenAIMessage):
-            m = OpenAIMessage(**m)
     
     if len(messages) == 0:
         messages = [OpenAIMessage(role="system", content=system_prompt)]
@@ -149,16 +130,24 @@ def llm_call_get_completion_params(
         **hyperparams,
     }
 
-
 def llm_call_post_process_response(
-    model_settings: ModelSettings, messages: list[OpenAIMessage], response: ModelResponse
-) -> Any:
+    model_settings: ModelSettings, messages: list[OpenAIMessage], response: Optional[ModelResponse | Exception]
+) -> OpenAIMessage:
 
     # unswap roles for user
     if model_settings.role == "user":
         messages = swap_roles(messages)
 
-    # process the message
+    # process empty or error responses
+    assert response is not None, "Received empty response."
+    if isinstance(response, Exception):
+        print(f"API call for {model_settings.model} failed: {response}. Returning string 'error' and continuing.")
+        # some models require an alternate user / assistant dialog
+        if len(messages) == 0 or messages[-1].role != "user":
+            return OpenAIMessage(role="user", content="error")
+        else:
+            return OpenAIMessage(role='assistant', content="error")
+    
     raw_message = response.choices[0].message
     response_message = OpenAIMessage(
         role=raw_message["role"], content=raw_message["content"]
@@ -172,26 +161,38 @@ def llm_call_post_process_response(
 def llm_messages_call(
     model_settings: Optional[ModelSettings], messages: list[OpenAIMessage] = []
 ) -> OpenAIMessage:
-    """Make an LLM call with the messages provided"""
-
-    # get the params
-    params = llm_call_get_completion_params(model_settings, messages)
-
-    # call the LLM
-    response = router.completion(**params)
-
-    # post process the response
-    message: OpenAIMessage = llm_call_post_process_response(
-        model_settings, messages, response
-    )
-
-    return message
+    raise NotImplementedError
 
 async def allm_messages_call(
-    model_settings: ModelSettings = None, 
-    messages: list[OpenAIMessage] | list[dict[str, str]] = None
+    model_settings: Optional[ModelSettings | str] = None, 
+    messages: list[OpenAIMessage] | list[dict[str, str]] = [],
+    **model_settings_kwargs,
 ) -> OpenAIMessage:
     """Make an LLM call with provided model_settings and messages"""
+    
+    # resolve the model_settings
+    if model_settings is None:
+        model_settings = ModelSettings(
+            model="openai/gpt-4o-mini",
+            system_prompt="Be a good assistant.",
+            role="assistant",
+        )
+    elif isinstance(model_settings, dict):
+        model_settings = ModelSettings(**model_settings)
+    elif isinstance(model_settings, str):
+        model_settings: ModelSettings = get_model_settings(agent_name=model_settings)
+        
+    if model_settings_kwargs:
+        for setting, value in model_settings_kwargs.items():
+            # for template_params and hyperparams, we need to merge
+            if isinstance(getattr(model_settings, setting), dict) and isinstance(value, dict):
+                current_setting: dict = getattr(model_settings, setting)
+                current_setting.update(value)
+            # for everything else, just set the value
+            else:
+                setattr(model_settings, setting, value)
+
+    assert type(model_settings) == ModelSettings, "model_settings type is invalid"
 
     # get the params
     params = llm_call_get_completion_params(model_settings, messages)
@@ -217,87 +218,3 @@ async def aembed_text(text: str, **kwargs):
 def messages_to_string(messages: list[OpenAIMessage]) -> str:
     """Convert a list of messages to a string"""
     return "\n".join([m.role + ":\n" + m.content for m in messages])
-
-
-# evaluator decorator to wrap an app scorer inside a EvalResult object
-# TODO: composable evaluators
-def evaluator(eval_func=None, *, repeat=1, embed_explanation=True) -> EvalResult:
-    def decorator(func):
-        @wraps(eval_func)
-        async def wrapper(run_data: RunData, *args, **kwargs):
-            async def single_run():
-                if asyncio.iscoroutinefunction(func):
-                    # If the eval_func is already a coroutine function, just await it
-                    response = await func(run_data.final_state, *args, **kwargs)
-                else:
-                    # If it's a regular function, run it in a thread pool
-                    response = await asyncio.to_thread(
-                        func, run_data.final_state, *args, **kwargs
-                    )
-
-                # verify that the eval_func response is a tuple of 3 elements (score: Any, result: bool | None, explanation: str | None)
-                if (
-                    not 2 <= len(response) <= 3
-                    or type(response) not in [list, tuple]
-                    or type(response[1]) not in [bool, type(None)]
-                    or (
-                        len(response) == 3
-                        and type(response[2]) not in [str, type(None)]
-                    )
-                ):
-                    raise ValueError(
-                        "Evaluator response must be a tuple of 2 elements, the score of type Any and result of type bool | None"
-                    )
-
-                # unpack results
-                score = None
-                result = None
-                explanation = None
-                if len(response) == 3 and response[2] is not None:
-                    score, result, explanation = response
-                    if embed_explanation:
-                        embedding = await aembed_text(explanation)
-                    return (score, result, explanation, embedding)
-
-                score, result = response
-                return (score, result, None, None)
-
-            assert repeat >= 0, "Repeat must be greater than 0"
-
-            if repeat == 0:
-                return None
-
-            if repeat > 1:
-                tasks = [single_run() for _ in range(repeat)]
-                score_result_tuples = await asyncio.gather(*tasks)
-                scores, results, explanations, embeddings = zip(*score_result_tuples)
-
-                # for repeats, return the full array of scores and results
-                return EvalResult(
-                    scores,
-                    results,
-                    explanations,
-                    embeddings,
-                    run_data,
-                    func.__name__,
-                    repeat,
-                )
-            else:
-                # for single runs, return a single score and result
-                score, result, explanation, embedding = await single_run()
-                return EvalResult(
-                    score,
-                    result,
-                    explanation,
-                    embedding,
-                    run_data,
-                    func.__name__,
-                    repeat,
-                )
-
-        return wrapper
-
-    if eval_func is None:
-        return decorator
-    else:
-        return decorator(eval_func)

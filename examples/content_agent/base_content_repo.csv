@@ -1,0 +1,56 @@
+Timestamp,Text,Link
+2024-08-12 14:38:14,"dope article on how to build a good benchmark
+
+<https://www.safe.ai/blog/devising-ml-metrics>",https://www.safe.ai/blog/devising-ml-metrics
+2024-08-12 14:02:12,"new Devin competitor takes the SWE-bench leaderboard top rank
+
+<https://cosine.sh/blog/genie-technical-report>",https://cosine.sh/blog/genie-technical-report
+2024-08-12 13:49:58,<https://kamilelukosiute.com/llms/You+need+to+be+spending+more+money+on+evals>,https://kamilelukosiute.com/llms/You+need+to+be+spending+more+money+on+evals
+2024-08-12 13:40:32,"top model on llm fact checker leaderboard
+
+<https://huggingface.co/bespokelabs/Bespoke-MiniCheck-7B>",https://huggingface.co/bespokelabs/Bespoke-MiniCheck-7B
+2024-08-12 13:39:52,"hallucination detection benchmark
+
+<https://llm-aggrefact.github.io/>",https://llm-aggrefact.github.io/
+2024-08-12 13:29:59,findings from Eleuther AI team on challenges in llm evals,
+2024-08-12 13:28:33,"llm eval robustness to prompt formats
+
+<https://x.com/m_ryabinin/status/1822691135430545621>",https://x.com/m_ryabinin/status/1822691135430545621
+2024-08-12 10:08:44,<https://github.com/NirDiamant/RAG_Techniques>,https://github.com/NirDiamant/RAG_Techniques
+2024-08-11 18:15:45,<https://x.com/0xtyllen/status/1820880060012023996?s=12>,https://x.com/0xtyllen/status/1820880060012023996?s=12
+2024-08-10 13:32:59,"gpt 5 rumor mill has started
+
+<https://x.com/iruletheworldmo/status/1822364945226371306?s=46|https://x.com/iruletheworldmo/status/1822364945226371306?s=46>",https://x.com/iruletheworldmo/status/1822364945226371306?s=46
+2024-08-14 08:07:52,<https://github.com/apple/ToolSandbox>,https://github.com/apple/ToolSandbox
+2024-08-13 19:59:33,"cool no code engine
+
+<https://x.com/rileybrown_ai/status/1823551303680745936?s=46|https://x.com/rileybrown_ai/status/1823551303680745936?s=46>",https://x.com/rileybrown_ai/status/1823551303680745936?s=46
+2024-08-13 19:38:51,<https://x.com/bclavie/status/1823405973811421529>,https://x.com/bclavie/status/1823405973811421529
+2024-08-13 19:38:47,<https://arxiv.org/abs/2303.00807>,https://arxiv.org/abs/2303.00807
+2024-08-13 19:38:20,<https://arxiv.org/abs/2406.11706>,https://arxiv.org/abs/2406.11706
+2024-08-13 13:17:25,"long context models not ready to replace RAG yet
+
+<https://www.databricks.com/blog/long-context-rag-performance-llms>",https://www.databricks.com/blog/long-context-rag-performance-llms
+2024-08-13 08:13:46,"Recent company raises
+• <https://link.mail.beehiiv.com/ss/c/u001.YaCvhFC3-mBTvnvrUnyAGgYhug6zNhmNbb5nYWztOYrp0ufvT7irdCTocgP5oMvWqLeWjFPT0wvFcvwStRU5_LEruXiaq4aXwGfUAVTI67SonsgC0BnIM7AtzaRmhNi560DW1cvzvn6nqQS5H0SNIxoEJBo4dpft0NebixSkNbZPhLfH2gdm1Fbdxa_Nycz5UJ2g5Ieu20ybxrUGKd59DNN86c8SqoeGy2LeSI4i9gE/48v/R7LX9D_SQiejFyq3wzrLoQ/h9/h001.WQMo6QOgqJVRuQVAMedqY9vzpXBOg1FeKtB6WZOXxt8|Cosine> raises a $2.5M Seed — AI software engineer
+• <https://link.mail.beehiiv.com/ss/c/u001.Ix4hPvJLSyhwVwPrPCup06zAl-yRsPJ292znl7j-5JQ7YDNHSfnQIzXpaIZ38kZIXWaHkJdUMA99ybRsp2CZIOyqIxqJHxXmUos-O6U1j2InQN2yRA3c8ir9dZWv2cPGStnKIw8S_XF4qX3mlp112EHE5Ix9WM67G1BPlDp4NfEB_s0jpYiOmcc3SSzKa3cl6Gc8J_4AhqP_YDAaFLv9qDfkzV6CzJcfzacXoNE6g-Y/48v/R7LX9D_SQiejFyq3wzrLoQ/h12/h001.CdcG-S2jZA98L84kxZJ3V6o5uGZaSLU4ehrNuM0XZSc|sync> raises a $5.5M Seed — AI lip-sync API
+• <https://link.mail.beehiiv.com/ss/c/u001.GFZemYBpMdzrG1oDMTxMGZIDewiEZF6Y-Ra9NdHxGFwMWgnsRqRFK29clFWO6ALgM6gjYVdZno2WesklqsPsIfZnNgvPgi-d3uqBAuErrBthkGPPVfSFNRBngXJnBZTb_VVGRPut4yEK9MazUsfJqYsarVQjwa6BNpECZ69mG6fICNSXKhcwFvrEXtXMe7fFLHFFUH6QdVSzWEwualZA-0saOIXSjt4cMctLwhZilL0/48v/R7LX9D_SQiejFyq3wzrLoQ/h15/h001.xjF4dtDjkaiAuZAtuOiT69feTi4Ozz6XFIY3WLiO934|Ragie> raises a $5.5M Seed — RAG-as-a-service
+• <https://link.mail.beehiiv.com/ss/c/u001.Ld5qQ1n83_OvHGVddlJ8WlfuavTxn8xKkFnBljqQ5jETpQ1CHITe3AN4A0cEApjbhBJQE44lV6cFvNwLcUFvLHC-k47CtUeHrg5ki3wbxOiqL-BaJnjDF-q3W0OWTFVwyYJiUvYDo6zXwmQcDdF6ei9MA-utxuaiKc5AVgxQo2slBWzOyNAj3ptNFMZXRhRXndeQnRVRoxmjM2vQ7MZnnNsstZiT93KBhRzFQfvqu7A/48s/BAzEBAcnRy6ArAO576ZWNw/h9/h001.avMAS3tz5nBQqlA6GM6wmoqcmEPut20EB3YaFPnjQxQ|DevRev> raises a $100M Series A — AI agents for enterprises
+• <https://link.mail.beehiiv.com/ss/c/u001.GFZemYBpMdzrG1oDMTxMGVK3i3CbBDW7ZoOBdbV6BnH3mKQOmUjwUxoUrKS_Wvt7GuSbpV64PoUKYsk4lEHxKnckm4etgvt-wtbBgTH-ZKUmftBQJB-QCMskKrxBG26ryL3uAzJmdtDEopFP-4P6XfH8YWZOdIh-7Kc5IdLxpBD7OPZaItGCWGAALu9zxOOZAkZaC5ZRPekr5IyBB7JCInA-bCbU2ARufAc60kWH3DbPRWUDowZqjAXkoqmtRZkC/48s/BAzEBAcnRy6ArAO576ZWNw/h12/h001.tLr-7Yk4j-OWKwr6e3VP2KrTM6d6BzPG0BFwAwJHjjk|Feeling Great> raises a $8M Seed — AI therapy
+• <https://link.mail.beehiiv.com/ss/c/u001.GFZemYBpMdzrG1oDMTxMGdE2eQqh9_xmCwOWFNeAD9t79m_WEIBwbgFVgMFj-gJ_8bkTPnyPmkqqQyTJ3PBjY6wrW-2DcLowIBFJpUsPqHE5XNA9jf63UNqzrvWoZgOKGSSczp2KiipTzUtM63oNxd-7_YVNjqSK1V1_pQk7Qr3QTHDeYqKwOctducs7s0Ycm6xXMHnc8uIeVwM-6OoFlY5JbLev7eOKLCS3N0eRdGU/48s/BAzEBAcnRy6ArAO576ZWNw/h15/h001.7vcbhim1yTJnHcM5gLog9pOde7yzAVhOLQjNh1nPh_E|Bardeen> raises a $3M Series A2 — AI web agents
+• <https://link.mail.beehiiv.com/ss/c/u001.5hNmlOn_gc4YdeII3IhgFacyriNn9vT4iXC15u86v82RLnNj1nrwu-2qsidMv1n4oVMHZ-fbTLeBLIRPhmq82YUnAxLPjwOBnT0MtEGpv5AziO1V8kHgKl4ZAVUsVvHASCoxuRSnj1ucLiRv-OxnEjUNz0xraHkxbUUfgYrtpLgk6u1z2oEsuKtsPZDFbpZWxeeyrNFxQQ-x82wQ_258EExEbSPhAE5Cx-xzkNo8x_m_gt_OYBTBCqkJ7Dnvn4Eu/48p/-78fU6PLSBmIvLKzzCrX6A/h7/h001.YAbp5hQukbDKFHJsgRh1wylBC1eI17Axnlc7QxPJonc|Abnormal> raises a $250M Series D — Email security powered by human behaviour modelling
+• <https://link.mail.beehiiv.com/ss/c/u001.GFZemYBpMdzrG1oDMTxMGdKJBDPNGZJx9KJbqTECWm5HUMgW9H1RIg-_H9rx4ZDjTXVtwLh-IW4UFzG7c1YAYinIJosvbt5hrjx6u810yKEyqPPDDJD_DsPmuqKjPi91RV24AiLA0s-dLc_7GlaKuAzvmsRCTSsmS2FqnNNV5bgDHLgA8ZtpHiTQ2Je58PDBLMEK3HPYfLTyUQtgxW3vPMfWugbeawgG67w3frReJCw/48p/-78fU6PLSBmIvLKzzCrX6A/h10/h001.tuQAoGyRUAcNSbQSP7XjOL5aAza6vOcx-qW19Q4IaGY|ProRata> raises a $25M Series A — AI chatbot with revenue-sharing
+• <https://link.mail.beehiiv.com/ss/c/u001.GFZemYBpMdzrG1oDMTxMGZTo8KmljlhxAILQUe8NXYXb-aFUfO3FLO0NAeUmAa92XWd5yWYHUGgBL5bdBslsgpnzIyvQvCCXOWsGgEOjcxS95oRotGH83zG2HulZ0Jo_PZ5dBW4CDVJ-FXQcIJS1OvGWxG_biCZYebaB2lh53JG3jJM4gg7tbl-b00-ZfwuXFK4RVHWSBsb0LMJTFdFTOPBEY3FDjufAGA0FuBcr3bM/48p/-78fU6PLSBmIvLKzzCrX6A/h13/h001.OPHSpyVjbHA_ObxTa36j2Z9NA5TLBKkSuS_l-xiW8Xs|Payman> raises a $3M Pre-Seed — AI to human payments",
+2024-08-12 19:53:14,"handle with care
+
+jailbreak prompts for all major AI models
+
+<https://github.com/elder-plinius/L1B3RT45|https://github.com/elder-plinius/L1B3RT45>",https://github.com/elder-plinius/L1B3RT45
+2024-08-12 19:37:06,"self-replicating adversarial AI demo
+
+<https://x.com/elder_plinius/status/1772349864967274989?s=46|https://x.com/elder_plinius/status/1772349864967274989?s=46>",https://x.com/elder_plinius/status/1772349864967274989?s=46
+2024-08-12 19:25:43,"we’re either 1 year or 100 years away from AGI, i really can’t tell 
+
+agentic science has arrived
+
+<https://x.com/sakanaailabs/status/1823178623513239992?s=46|https://x.com/sakanaailabs/status/1823178623513239992?s=46>",https://x.com/sakanaailabs/status/1823178623513239992?s=46

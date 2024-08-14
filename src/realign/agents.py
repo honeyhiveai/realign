@@ -1,11 +1,13 @@
-from realign.types import ModelSettings, OpenAIMessage
-from realign.prompts import resolve_prompt_template
-from realign.llm_utils import llm_messages_call, allm_messages_call, State
 from typing import Optional, Any, Generator
 from abc import abstractmethod
 import json
 import os
 import asyncio
+
+from realign.types import OpenAIMessage
+from realign.prompts import resolve_prompt_template
+from realign.config import ModelSettings
+from realign.llm_utils import llm_messages_call, allm_messages_call, State
 
 class AbstractAgent:
     def __init__(self, **model_settings):
