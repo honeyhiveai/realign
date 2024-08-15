@@ -8,7 +8,7 @@ from realign.llm_utils import allm_messages_call
 
 
 # File to store processed links
-cwd = os.path.join(os.getcwd(), 'examples', 'content_agent')
+cwd = os.path.join(os.getcwd())
 PROCESSED_LINKS_FILE = os.path.join(cwd, 'processed_links.txt')
 BASE_CONTENT_REPO = os.path.join(cwd, 'base_content_repo.csv')
 INFO_BITES_FILE = os.path.join(cwd, 'info_bites.csv')
