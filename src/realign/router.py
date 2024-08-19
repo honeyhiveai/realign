@@ -9,8 +9,6 @@ from litellm import acompletion, token_counter
 from litellm.exceptions import RateLimitError, APIConnectionError, BadRequestError
 from litellm.utils import ModelResponse
 
-from realign.types import OpenAIMessage
-
 class ModelRouter:
     
     RETRIABLE_EXCEPTIONS = [RateLimitError, APIConnectionError, Exception]

@@ -12,7 +12,7 @@ class ContentAgent(Simulation):
     async def setup(self):
         fetch_and_write_messages()
 
-    async def coroutine(self):
+    async def main(self):
         HoneyHiveTracer.init(
             api_key=os.environ['HH_API_KEY'],
             project=os.environ['HH_PROJECT'],
@@ -22,4 +22,4 @@ class ContentAgent(Simulation):
         await process_csv()
 
 sim = ContentAgent()
-sim.run(2)
+sim.run(5)

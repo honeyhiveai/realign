@@ -1,13 +1,21 @@
 
 llm_agents:
-  default: &basic_model_settings
+  default: &basic_agent_settings
     model: openai/gpt-4o-mini
     system_prompt: |
       What's the capital of France?
 
+  eval_gen:
+    model: openai/gpt-4o-mini
+    template: |
+      You are an LLM Evaluation Scientist.
+      Your task is to process a summary of an LLM application, and generate evaluation metrics for it. 
+      Given the user input {{input}}, 
+
 evaluators:
   pymean:
     weight: 1.0
+    repeat: 2
     asserts: off
 
   npmean:
@@ -15,25 +23,38 @@ evaluators:
     asserts: off
     
   numrange:
-    weight: 1.0
-    asserts: on
+    weight: 5.0
+    # asserts: on
+    target: (,10)
 
   fourtytwo:
-    weight: 1.0
+    weight: 7.0
+    repeat: 2
     asserts: off
+    transform: result + 32
+    aggregate: sum(values)/len(values)
 
   custom_eval:
-    weight: 1.0
-    repeat: 3
+    weight: 13.0
+    repeat: 1
     asserts: off
-    transform: insert_noise(result) # result is between 3 and 7
-    aggregate: pymean(results)
+    transform: insert_noise(value) # result is between 37 and 49
+    aggregate: min(pymean(values), 5) # 42
     checker: numrange
-    target: [3, 5]
+    target: (,40)
 
   composite:
     weight: 1.0
+    repeat: 3
     asserts: off
-    aggregate: weighted_mean(*results)
+    transform: fourtytwo(value)
+    aggregate: weighted_mean(*values, *results)
+    checker: numrange
+    target: (0,9)
 
-    
+
+  simple_add:
+    weight: 8
+    transform: int(value == 45) + 1
+    repeat: 2
+    aggregate: weighted_mean(values, results)

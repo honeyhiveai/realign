@@ -1,7 +1,7 @@
 
 from realign.agents import ChatAgent, SyntheticUserFactory
 from realign.simulation import ChatSimulation
-from realign.evaluators.llm_evaluators import allm_summary
+from lab.evaluators.llm_evaluators import allm_summary
 
 # initialize simulation
 simulation = ChatSimulation(runs=2, max_messages=6)

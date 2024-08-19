@@ -1,24 +1,46 @@
 from realign.simulation import Simulation
 from realign.llm_utils import allm_messages_call
-
-# Place the code below at the beginning of your application to initialize the tracer
-
+from realign.evals import evaluator
 
 import realign
-realign.config_path = 'examples/content_agent/config.yaml'
+realign.config_path = 'examples/simulation_with_config/config.yaml'
 
 
 class TestSimulation(Simulation):
+    
+    
+    # run_context -> run_context
+    
+    async def setup(self):
+        
+        message = await allm_messages_call(
+                agent_name='prompt_writer', 
+                template_params={
+                    'user_request': 'Write a post on the negative impacts of AI',
+                    'platform': 'Twitter',
+                },
+            )
+        self.tweet_prompt = message.content
+        print('tweet_prompt', self.tweet_prompt)
+        
+        self.evaluators = [evaluator(len)]
 
-    async def coroutine(self):
-
-        message = await allm_messages_call('twitter_content_agent', 
-                                           messages=[{
-                                                'role': 'user', 
-                                                'content': 'using synthetic datasets to tune evaluators'
-                                            }],
-                                        )
+    async def main(self, run_context) -> None:
+        
+        message = await allm_messages_call(
+                            agent_name='twitter_content_agent', 
+                            messages=[{
+                                'role': 'user', 
+                                'content': self.tweet_prompt
+                            }],
+                        )
+        
+        print(run_context.run_id)
         print(message.content)
+        print('\n\n\n')
+        
+        return message.content
+
 
 sim = TestSimulation()
 sim.run(10)

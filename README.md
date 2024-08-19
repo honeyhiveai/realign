@@ -226,17 +226,17 @@ Realign offers a library of well-tuned evaluators which you can directly import 
 - LLM as a judge evaluators (using an intelligent model to evaluate)
 - NLP evaluators (such as BERT-based evaluators)
 
-## ModelSettings
+## AgentSettings
 
-ModelSettings are used to specify all the ***stateless*** settings of an LLM calls. By stateless, we mean all the settings which don’t depend on the application / agent state. For example, ModelSettings does not include `messages` since it is *stateful.*
+AgentSettings are used to specify all the ***stateless*** settings of an LLM calls. By stateless, we mean all the settings which don’t depend on the application / agent state. For example, AgentSettings does not include `messages` since it is *stateful.*
 
-ModelSettings applies to *all* LLM calls in Realign, including app agent LLM calls, synthetic user LLM calls, and evaluator LLM calls. 
+AgentSettings applies to *all* LLM calls in Realign, including app agent LLM calls, synthetic user LLM calls, and evaluator LLM calls. 
 
-Here’s the spec for ModelSettings:
+Here’s the spec for AgentSettings:
 
 ```python
 @dataclass
-class ModelSettings:
+class AgentSettings:
 		# litellm model name. Refer to https://docs.litellm.ai/docs/providers.
     model: str 
     

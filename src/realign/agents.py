@@ -4,21 +4,24 @@ import json
 import os
 import asyncio
 
-from realign.types import OpenAIMessage
-from realign.prompts import resolve_prompt_template
-from realign.config import ModelSettings
-from realign.llm_utils import llm_messages_call, allm_messages_call, State
+from realign.llm_utils import (
+    llm_messages_call, 
+    allm_messages_call, 
+    State, 
+    OpenAIMessage,
+    AgentSettings,
+)
 
 class AbstractAgent:
-    def __init__(self, **model_settings):
-        if 'model_settings' not in model_settings:
-            model_settings = ModelSettings(**model_settings)
-        elif type(model_settings['model_settings']) != ModelSettings:
-            raise ValueError("model_settings must be of type ModelSettings")
+    def __init__(self, **agent_settings):
+        if 'agent_settings' not in agent_settings:
+            agent_settings = AgentSettings(**agent_settings)
+        elif type(agent_settings['agent_settings']) != AgentSettings:
+            raise ValueError("agent_settings must be of type AgentSettings")
         else:
-            model_settings = model_settings['model_settings']
+            agent_settings = agent_settings['agent_settings']
 
-        self.model_settings: ModelSettings = model_settings
+        self.agent_settings: AgentSettings = agent_settings
 
     @abstractmethod
     def process_turn(self, state: Any) -> Optional[Any]:
@@ -27,29 +30,29 @@ class AbstractAgent:
     
 class ChatAgent(AbstractAgent):
 
-    def __init__(self, **model_settings):
-        default_model_settings = {
+    def __init__(self, **agent_settings):
+        default_agent_settings = {
             'model': 'openai/gpt-4o-mini',
             'role': 'assistant',
             'system_prompt': 'Be a friendly assistant. Always respond with a single concise sentence.',
         }
 
-        if 'model_settings' in model_settings:
-            super().__init__(**model_settings)
+        if 'agent_settings' in agent_settings:
+            super().__init__(**agent_settings)
         else:
-            agent_model_settings = {
-                **default_model_settings,
-                **model_settings
+            agent_agent_settings = {
+                **default_agent_settings,
+                **agent_settings
             }
 
-            super().__init__(**agent_model_settings)
+            super().__init__(**agent_agent_settings)
         
     async def aprocess_turn(self, state: State = State()) -> State:
         '''Process a turn in the conversation'''
         
-        new_message: OpenAIMessage = await allm_messages_call(model_settings=self.model_settings, messages=state.messages)
+        new_message: OpenAIMessage = await allm_messages_call(agent_settings=self.agent_settings, messages=state.messages)
 
-        new_message.role = self.model_settings.role
+        new_message.role = self.agent_settings.role
         
         state.messages.append(new_message)
         
@@ -62,12 +65,12 @@ class ChatAgent(AbstractAgent):
 class AgentBuilder:
     
     def __init__(self):
-        self.model_settings: ModelSettings = None
+        self.agent_settings: AgentSettings = None
         self.system_prompt: str = ""
         self.role: str = ""
 
     def with_model(self, model: str) -> 'AgentBuilder':
-        self.model_settings.model = model
+        self.agent_settings.model = model
         return self
 
     def with_system_prompt(self, prompt: str) -> 'AgentBuilder':
@@ -76,11 +79,11 @@ class AgentBuilder:
     
     def with_template(self, template: str) -> 'AgentBuilder':
         assert resolve_prompt_template(template), "Template not found"
-        self.model_settings.template = template
+        self.agent_settings.template = template
         return self
     
     def with_template_params(self, template_params: dict[str, str]) -> 'AgentBuilder':
-        self.model_settings.template_params = template_params
+        self.agent_settings.template_params = template_params
         return self
 
     def with_role(self, role: str) -> 'AgentBuilder':
@@ -88,33 +91,33 @@ class AgentBuilder:
         return self
 
     def with_hyperparameters(self, hyperparams: dict[str, Any]) -> 'AgentBuilder':
-        self.model_settings.hyperparams = hyperparams
+        self.agent_settings.hyperparams = hyperparams
         return self
 
     def build(self) -> ChatAgent:
-        if not self.model_settings:
+        if not self.agent_settings:
             raise ValueError("Model settings must be set")
-        if not self.model_settings.model:
+        if not self.agent_settings.model:
             raise ValueError("Model must be set")
         if not self.system_prompt:
             raise ValueError("System prompt must be set")
         if not self.role:
             raise ValueError("Role must be set")
 
-        self.model_settings.system_prompt = self.system_prompt
-        self.model_settings.role = self.role
+        self.agent_settings.system_prompt = self.system_prompt
+        self.agent_settings.role = self.role
 
-        return ChatAgent(model_settings=self.model_settings)
+        return ChatAgent(agent_settings=self.agent_settings)
 
 class SyntheticUserAgent(ChatAgent):
     
-    def __init__(self, **model_settings):
-        model_settings = model_settings or {'model_settings': ModelSettings(
+    def __init__(self, **agent_settings):
+        agent_settings = agent_settings or {'agent_settings': AgentSettings(
             model='openai/gpt-4o-mini',
             role='user',
         )}
         self.role = 'user'
-        super().__init__(**model_settings)
+        super().__init__(**agent_settings)
 
 class SyntheticUserFactory(AgentBuilder):
     
@@ -125,7 +128,7 @@ class SyntheticUserFactory(AgentBuilder):
         self.role = 'user'
         self.persona = None
         self.scenario = None
-        self.synth_user_builder_model_settings = ModelSettings(
+        self.synth_user_builder_agent_settings = AgentSettings(
             model='openai/gpt-4o-mini',
             role='user',
             template='synthetic_user_prompt_generator',
@@ -148,7 +151,7 @@ class SyntheticUserFactory(AgentBuilder):
         return self
     
     def with_app_objective(self, app_objective: str) -> 'SyntheticUserFactory':
-        self.synth_user_builder_model_settings.template_params['app'] = app_objective
+        self.synth_user_builder_agent_settings.template_params['app'] = app_objective
         return self
     
     def with_system_prompt(self, system_prompt: str) -> 'SyntheticUserFactory':
@@ -181,16 +184,16 @@ class SyntheticUserFactory(AgentBuilder):
             next_persona = next(self.persona_generator)
             
             # copy the model settings
-            self.synth_user_builder_model_settings = self.synth_user_builder_model_settings.copy()
+            self.synth_user_builder_agent_settings = self.synth_user_builder_agent_settings.copy()
         
             # generate the synthetic user prompt
-            self.synth_user_builder_model_settings.template_params = {
-                **self.synth_user_builder_model_settings.template_params,
+            self.synth_user_builder_agent_settings.template_params = {
+                **self.synth_user_builder_agent_settings.template_params,
                 'scenario': self.scenario,
                 'persona': next_persona,
             }
 
-            prompt_renderer_agent = ChatAgent(model_settings=self.synth_user_builder_model_settings)
+            prompt_renderer_agent = ChatAgent(agent_settings=self.synth_user_builder_agent_settings)
             messages: list[OpenAIMessage] = prompt_renderer_agent.process_turn()
             if len(messages) == 0:
                 raise ValueError("No messages generated")
@@ -201,7 +204,7 @@ class SyntheticUserFactory(AgentBuilder):
             synthetic_user_agent = SyntheticUserAgent(model=self.synth_user_model)
         else:
             synthetic_user_agent = SyntheticUserAgent()
-        synthetic_user_agent.model_settings.system_prompt = self.synth_user_system_prompt
+        synthetic_user_agent.agent_settings.system_prompt = self.synth_user_system_prompt
         self.synth_user_system_prompt = None
 
         return synthetic_user_agent
@@ -218,7 +221,7 @@ class SyntheticUserFactory(AgentBuilder):
             next_persona = self.retrieved_personas[persona_idx]
             
             # copy the model settings
-            settings_copy = self.synth_user_builder_model_settings.copy()
+            settings_copy = self.synth_user_builder_agent_settings.copy()
         
             # generate the synthetic user prompt
             settings_copy.template_params = {
@@ -227,7 +230,7 @@ class SyntheticUserFactory(AgentBuilder):
                 'persona': next_persona,
             }
 
-            prompt_renderer_agent = ChatAgent(model_settings=settings_copy)
+            prompt_renderer_agent = ChatAgent(agent_settings=settings_copy)
             state: State = await prompt_renderer_agent.aprocess_turn()
             if len(state.messages) == 0:
                 raise ValueError("No messages generated")
@@ -241,7 +244,7 @@ class SyntheticUserFactory(AgentBuilder):
             synthetic_user_agent = SyntheticUserAgent(model=self.synth_user_model)
         else:
             synthetic_user_agent = SyntheticUserAgent()
-        synthetic_user_agent.model_settings.system_prompt = system_prompt
+        synthetic_user_agent.agent_settings.system_prompt = system_prompt
         
         print('Built synthetic user', persona_idx + 1)
 

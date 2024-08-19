@@ -1,19 +1,44 @@
-from realign.datasets import Dataset, ChatDataset
-from realign.evaluation import EvalResult
-from realign.types import RunData, OpenAIMessage
-from realign.llm_utils import router, State, system_prompt_str, str_msgs, print_run_id, print_evals
-from realign.agents import AbstractAgent, AgentBuilder, SyntheticUserFactory, SyntheticUserAgent, ChatAgent
-
-from typing import Any, Self, Callable, Coroutine
 import asyncio
-from dotenv import load_dotenv
 import json
 import os
 import inspect
+from typing import Any, Self, Callable, Coroutine
+from dataclasses import dataclass
+
+from dotenv import load_dotenv
+
+from realign.datasets import Dataset, ChatDataset
+from realign.llm_utils import (
+    router, 
+    State,
+    RunData,
+    system_prompt_str, 
+    str_msgs, 
+    print_run_id
+)
+from realign.agents import (
+    AbstractAgent, 
+    AgentBuilder, 
+    SyntheticUserFactory, 
+    SyntheticUserAgent, 
+    ChatAgent
+)
+from realign.evals import EvalResult
+from realign.utils import arun_callables
+
+
+@dataclass
+class Context:
+    run_id: int
+    
+    initial_state: State = None
+    final_state: State = None
+    
+    run_data: RunData = None
+    eval_results: list[EvalResult] = None
 
 class Simulation:
-    # TODO: make synthetic user builder thread safe
-
+    
     def __init__(self):
         self.runs = None
         
@@ -27,24 +52,50 @@ class Simulation:
         self.run_data: dict[int, RunData] = dict()
         self.eval_results: dict[int, list[EvalResult]] = dict()
 
-    async def setup(self, runs: int):
+    async def setup(self):
         '''Sets up objects used in the simulation'''
-
-        # simulation components accessible to the coroutine
+        
+        # simulation components accessible to main
         self.dataset: Dataset = None
         self.app: AbstractAgent = None
         self.evaluators: list[Callable] = []
-
-    async def coroutine(self, run_id: int) -> RunData:
-        raise NotImplementedError("Simulation coroutine must be defined")
-
+        
+    async def before_each(self, run_context: Context):
+        '''Runs asyncronously before each simulation run'''
+        return None
+    
+    async def main(self, run_context: Context) -> RunData:
+        print('Running empty main! Please override.')
+    
+    async def after_each(self, run_context: Context):
+        '''Runs synchronously after each simulation run'''
+        
+        if self.evaluators and len(self.evaluators) > 0:
+            evals: list[EvalResult] = await arun_callables(funcs=self.evaluators, 
+                                                           args=[[run_context.final_state]])
+            
+            # save the evaluation results
+            run_context.eval_results = evals
+            print_run_id(run_context.run_id)
+        else:
+            run_context.eval_results = []
+        
+        
+    async def windup(self):
+        '''Runs synchronously after all simulation runs'''
+        
+        # aggregate the results
+        for run_id in range(self.runs):
+            self.run_data[run_id] = self.thread_contexts[run_id].run_data
+            self.eval_results[run_id] = self.thread_contexts[run_id].eval_results
+            
+        self.push_runs_to_dataset()
+        self.push_evals_dataset()
+    
     async def coroutine_with_evals(self, run_id: int) -> Any:
 
-        # run the simulation coroutine
-        if inspect.getfullargspec(self.coroutine).args == ['self']:
-            final_state = await self.coroutine()
-        else:
-            final_state = await self.coroutine(run_id)
+        # run the simulation main
+        final_state = await self.main(run_id)
 
         # wrap the simulation run as an object
         sim_run_data = RunData(final_state, run_id=run_id)
@@ -68,27 +119,42 @@ class Simulation:
             self.eval_results[run_id] = evals
 
             print_run_id(run_id)
-            print_evals(evals)
+            # print_evals(evals)
+        
+    async def run_concurrently(self, run_context: Context):
+        
+        # before_each
+        await self.before_each(run_context)
             
+        # run the simulation main
+        run_context.final_state = await self.main(run_context)
+        run_context.run_data = RunData(run_context.final_state,
+                                          run_id=run_context.run_id)
+             
+        # after_each
+        await self.after_each(run_context)
+     
     async def run_simulation(self):
         
         # start timer
         start = asyncio.get_event_loop().time()
         
         try:
+            # set up the thread contexts
+            self.thread_contexts: list[Context] = [Context(run_id) for run_id in range(self.runs)]
             
-            # call setup
-            if inspect.getfullargspec(self.setup).args == ['self']:
-                await self.setup()
-            else:
-                await self.setup(runs=self.runs)
+            # setup
+            await self.setup()
             
+            # before_each, main, after_each
             simulation_run_tasks = [
-                self.coroutine_with_evals(run_id)
+                self.run_concurrently(self.thread_contexts[run_id])
                 for run_id in range(self.runs)
             ]
-            
             await asyncio.gather(*simulation_run_tasks)
+            
+            # windup
+            await self.windup()
 
         finally:
             if router:
@@ -115,7 +181,7 @@ class Simulation:
     def run(self, runs: int = 3) -> Self:
         '''Runs the main event loop for the simulation'''
 
-        # simulation is fundamentally a coroutine that runs N times
+        # simulation is fundamentally a main that runs N times
         self.runs = self.runs or runs
         
         # set model router settings to the environment
@@ -136,7 +202,13 @@ class Simulation:
         return self
     
     def export_run_data(self) -> dict:
-        raise NotImplementedError("Simulation export_run_data must be defined")
+        return_obj = {'inputs': [], 'outputs': [], 'ground_truths': [], 'metadata': []}    
+        for run_id, run_data in self.run_data.items():
+            state: State | None = run_data.final_state
+            if state:
+                return_obj['outputs'].append({'state': str(state)})
+                return_obj['metadata'].append({'run_id': run_id, 'run_data_hash': run_data.compute_hash()})
+        return return_obj
     
     def export_eval_results(self) -> dict:
         data_obj = {'run_data_hash': [], 'metadata': [], 'evaluations': []}
@@ -144,7 +216,8 @@ class Simulation:
             data_obj['run_data_hash'].append(self.run_data[run_id].compute_hash())
             eval_dict = dict()
             for eval_obj in evals:
-                eval_dict |= eval_obj.to_dict()
+                if isinstance(eval_obj, EvalResult):
+                    eval_dict |= eval_obj.to_dict()
             data_obj['evaluations'].append(eval_dict)
         return data_obj
     
@@ -180,6 +253,8 @@ class ChatSimulation(Simulation):
         super().__init__()
 
     async def setup(self, runs: int = 3):
+        await super().setup()
+        
         # simulation components
         self.app: ChatAgent = ChatAgent()
         self.synthetic_users: list[SyntheticUserAgent] = await SyntheticUserFactory() \
@@ -188,40 +263,41 @@ class ChatSimulation(Simulation):
                         .with_app_objective('answer a question') \
                         .abuild_many(runs)
     
-    async def coroutine(self, run_id: int) -> State:
+    async def main(self, run_context: Context) -> State:
         '''Simulates a chat conversation between the app and a synthetic user agent'''
         
         if not isinstance(self.app, ChatAgent) or not isinstance(self.synthetic_users, list) or not all(isinstance(user, SyntheticUserAgent) for user in self.synthetic_users):
             raise ValueError("App must be of type ChatAgent. Synthetic users must be of type list[SyntheticUserAgent]")
         
-        synth_user_agent = self.synthetic_users[run_id]
+        synth_user_agent = self.synthetic_users[run_context.run_id]
         print('synth user agent', synth_user_agent)
 
-        print_run_id(run_id)
-        print(system_prompt_str(self.app.model_settings))
-        print(system_prompt_str(synth_user_agent.model_settings))
+        print_run_id(run_context.run_id)
+        print(system_prompt_str(self.app.agent_settings))
+        print(system_prompt_str(synth_user_agent.agent_settings))
         
         max_messages = self.max_messages or 3
         
         state = State()
         if self.first_turn_role == 'user' and max_messages > 0:
             state = await synth_user_agent.aprocess_turn(state)
-            print_run_id(run_id)
+            print_run_id(run_context.run_id)
             print(str_msgs([state.messages[-1]]))
 
         while True:
             # app turn
             if len(state.messages) > max_messages: break
             state = await self.app.aprocess_turn(state)
-            print_run_id(run_id)
+            print_run_id(run_context.run_id)
             print(str_msgs([state.messages[-1]]))
 
             # synthetic user turn
             if len(state.messages) > max_messages: break
             state = await synth_user_agent.aprocess_turn(state)
-            print_run_id(run_id)
+            print_run_id(run_context.run_id)
             print(str_msgs([state.messages[-1]]))
 
+        # return the final state
         return state
 
     def export_run_data(self) -> dict:

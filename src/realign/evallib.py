@@ -1,43 +1,43 @@
-from typing import Callable, Optional, Union, Any
+from typing import Callable
 import inspect
+
+from realign.evals import evaluator, EvalResult, EvalSettings
+
+
+# ------------------------------------------------------------------------------
+# LIBRARY OF EVALUATORS
+# ------------------------------------------------------------------------------
+
 import itertools
 import math
 import random
 import string
 import re
 
-from realign.types import EvalResult
-
-# -------------------------------------------------------------------- #
-#  Evaluator Library
-
-def weighted_sum(*results: EvalResult) -> EvalResult:
+@evaluator
+def weighted_sum(values, results: list[EvalResult]):
     
     weighted_sum = 0
-    for result in results:
-        weighted_sum += result.score * result.weight
+    for value, result in zip(values, results):
+        print(value, result.weight)
+        weighted_sum += float(value) * result.weight
     
-    return EvalResult(weighted_sum, prev_results=results)
+    return weighted_sum
 
-def weighted_mean(*results: EvalResult) -> EvalResult:
-    
-    weighted_sum = 0
-    for result in results:
-        weighted_sum += result.score * result.weight
-        
-    weighted_mean = weighted_sum / sum(result.weight for result in results)
-    print('hellooo')
-    
-    return EvalResult(weighted_mean, prev_results=results)
-    
-    
+@evaluator
+def weighted_mean(values, results: list[EvalResult]):
+    return weighted_sum(values, results) / sum(result.weight for result in results)
+
+@evaluator
 def identity(x) -> EvalResult:
     return EvalResult(x)
 
+@evaluator
 def pymean(x) -> EvalResult:
     score = sum(x)/len(x)
     return EvalResult(score)
 
+@evaluator
 def npmean(x) -> EvalResult:
     try:
         import numpy as np
@@ -50,19 +50,28 @@ def npmean(x) -> EvalResult:
     
     return EvalResult(score)
 
+@evaluator
 def zero(x) -> EvalResult:
     return EvalResult(0)
 
-def fourtytwo(x) -> EvalResult:
-    return EvalResult(42)
+@evaluator
+def fourtytwo(x):
+    # print('getting settings inside fourtytwo', fourtytwo.settings)
+    return 42
 
-def numrange(x, target=None) -> EvalResult:
+@evaluator
+def numrange(x):
     '''Evaluator for checking if a numeric value is within a passing range'''
-
-    # For the numrange evaluator, target is the target numeric range
-    num_range = target
     
-    def in_num_interval(num_interval: Union[tuple, list], x):
+    assert x, 'numrange requires an argument'
+    
+    # For the numrange evaluator, target is the target numeric range
+    num_range = numrange.settings.target
+    
+    if num_range is None:
+        return True
+    
+    def in_num_interval(num_interval: tuple | list, x):
         '''Checks if x is between two numbers in num_interval, inclusive of the bounds'''
         
         assert type(num_interval) in [tuple, list] and len(num_interval) == 2, \
@@ -119,6 +128,7 @@ def numrange(x, target=None) -> EvalResult:
                 else:
                     return left < x
             else:
+                assert left <= right, f'invalid target range {str_interval}'
                 if left_inclusive and right_inclusive:
                     return left <= x <= right
                 elif left_inclusive and not right_inclusive:
@@ -146,18 +156,26 @@ def numrange(x, target=None) -> EvalResult:
         
     score = in_interval(num_range, x)
     
-    return EvalResult(score, prev_result=x)
+    return score
 
 
-# -------------------------------------------------------------------- #
 
+# ------------------------------------------------------------------------------
+# LOAD ALL EVALUATORS 
+# ------------------------------------------------------------------------------
 
-EXCLUDE_GLOBALS = ['resolve_evaluator_type', 'get_python_globals']
+EXCLUDE_GLOBALS = [
+    'get_evallib_functions',
+    'get_realign_utils',
+    'get_python_globals',
+    'evaluator',
+    'load_static_eval_funcs',
+]
 
-def resolve_evaluator_type(eval_type: Optional[str] = None) -> Optional[Callable]:
+def get_evallib_functions(eval_type: str | None = None) -> Callable | None:
     global_vars = globals()
     
-    # Filter out the resolve_evaluator_type function itself
+    # Filter out the get_evallib_functions function itself
     filtered_globals = {k: v for k, v in global_vars.items() 
                         if k not in EXCLUDE_GLOBALS and not k.startswith('__')}
     
@@ -169,11 +187,18 @@ def resolve_evaluator_type(eval_type: Optional[str] = None) -> Optional[Callable
         return callable_globals
     
     assert isinstance(eval_type, str), 'eval_type must be a string'
-    assert eval_type in callable_globals, f'No evaluator of type {eval_type} found'
     
     return callable_globals.get(eval_type)
 
+def get_realign_evals_utils():
+    return {
+        'evaluator': evaluator,
+        'EvalSettings': EvalSettings,
+        'EvalResult': EvalResult,
+    }
+
 def get_python_globals():
+    
     return {
         # Numeric functions
         'abs': abs,
@@ -306,3 +331,22 @@ def get_python_globals():
         're.split': re.split,
         're.compile': re.compile,
     }
+
+def load_static_eval_funcs():
+    
+    # get python globals
+    python_globals = get_python_globals()
+    
+    # get realign globals
+    realign_globals = get_realign_evals_utils()
+    
+    # get evallib globals
+    evallib_globals = get_evallib_functions()
+    
+    # merge all globals in the order of priority
+    evaluator.all_evaluators.update(python_globals)
+    evaluator.all_evaluators.update(realign_globals)
+    evaluator.all_evaluators.update(evallib_globals)
+    
+# Load static evaluator functions
+load_static_eval_funcs()

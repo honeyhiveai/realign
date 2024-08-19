@@ -2,6 +2,15 @@
 
 llm_agents:
 
+  prompt_writer:
+    model: openai/gpt-4o-mini
+    template: |
+      Pretend that you are a professional content writer who writes good content. Write a detailed instruction for an AI content writer which instructs it create the content that the user is asking for, suited for the {{ platform }} platform.
+
+      Here is the user request: {{ user_request }}
+
+      Respond ONLY with the instruction and NOTHING else in your response.
+
   content_agent: &content_agent
     model: openai/gpt-4o-mini
     template: |
