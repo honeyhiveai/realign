@@ -1,5 +1,5 @@
 
-from realign.evals import evaluator
+from realign.evaluators import evaluator
 
 
 if __name__ == '__main__':

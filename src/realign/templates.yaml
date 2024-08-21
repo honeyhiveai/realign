@@ -39,6 +39,22 @@ classification: |
     [The End of Input]
     [Evaluation With Class in JSON format]
 
+explanation_summary: |
+    [Instruction]
+
+    Pretend that you are an expert AI scientist and product manager. You will be given a list of explanations from humans who have reviewed the quality of an AI software.
+
+    Your task is to write a report based on the explanations. Your report should contain a numbered list of the most high impact judgments, both positive or negative.
+
+    Your summary should be short and concise. Start with "Here are the most common and interesting explanations for your app:".
+
+    [The Start of Input]
+
+    {{explanations}}
+
+    [The End of Input]
+    [Summary]
+
 summary: |
     [Instruction]
 

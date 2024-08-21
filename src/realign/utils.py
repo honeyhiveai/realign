@@ -1,5 +1,5 @@
 import asyncio
-from typing import Callable, Any
+from typing import Callable, Any, Coroutine
 
 class bcolors:
     HEADER = "\033[95m"
@@ -13,17 +13,6 @@ class bcolors:
     UNDERLINE = "\033[4m"
 
 async def arun_callables(funcs: list[Callable], args: list[list] = [[]], kwargs: list[dict] = [{}]) -> list[Any]:
-    """
-    Runs a list of functions (sync or async) in parallel using asyncio.gather.
-
-    Args:
-        funcs (list[Callable]): The list of functions to run
-        args (list[list]): The list of arguments to pass to each function
-        kwargs (list[dict]): The list of keyword arguments to pass to each function
-
-    Returns:
-        list[Any]: A list of the results of each function
-    """
     
     if len(funcs) != len(args) or len(funcs) != len(kwargs):
         raise Exception("funcs, args, and kwargs must all be the same length.")
@@ -38,3 +27,22 @@ async def arun_callables(funcs: list[Callable], args: list[list] = [[]], kwargs:
     
     results = await asyncio.gather(*tasks)
     return results
+
+
+
+def run_async(tasks: list[Coroutine] | Coroutine):
+    
+    # run the tasks in parallel
+    async def gather_async(*tasks):
+        return await asyncio.gather(*tasks)
+    
+    async def single_task(task):
+        return await task
+    
+    if not isinstance(tasks, (list, tuple)):
+        coroutine = single_task(tasks)
+    else:
+        coroutine = gather_async(*tasks)
+    
+    return asyncio.run(coroutine)
+

@@ -2,7 +2,7 @@ import os
 import json
 import asyncio
 from dataclasses import dataclass
-from typing import Any, Optional, Callable, Union
+from typing import Any, Optional, Callable, Union, Coroutine
 import hashlib
 import yaml
 
@@ -12,10 +12,9 @@ from jinja2 import Template
 from litellm import ModelResponse, aembedding, acompletion, validate_environment
 import litellm
 
-import realign
 from realign.router import Router
 from realign.config import load_yaml_settings
-from realign.utils import bcolors
+from realign.utils import bcolors, run_async
 
 
 # this flag helps litellm modify params to ensure that model-specific requirements are met
@@ -23,6 +22,10 @@ litellm.modify_params = True
 
 # initialize the global request router
 router = Router()
+        
+# Register the cleanup function
+# atexit.register(lambda: router or router.__del__())
+
 
 @dataclass
 class OpenAIMessage:
@@ -30,67 +33,64 @@ class OpenAIMessage:
     content: str | dict[str, str]
 
     def __dict__(self):
-        return {
-            'role': str(self.role),
-            'content': str(self.content)
-        }
+        return {"role": str(self.role), "content": str(self.content)}
+
 
 @dataclass
 class RunData:
     final_state: Any
     run_id: Optional[int] = None
-    
+
     def __dict__(self):
-        return {
-            'run_id': self.run_id,
-            'final_state': self.final_state
-        }
-    
+        return {"run_id": self.run_id, "final_state": self.final_state}
+
     def __repr__(self) -> str:
         return str(self.__dict__())
-    
-    def compute_hash(self, hash_algorithm='sha256'):
+
+    def compute_hash(self, hash_algorithm="sha256"):
         """
         Compute a hash of a RunData.
-        
+
         :param obj: The object to hash
         :param hash_algorithm: The hash algorithm to use (default is 'sha256')
         :return: A hexadecimal string representation of the hash
         """
         # Convert the object to a JSON string
         json_string = json.dumps(self.__dict__(), sort_keys=True, default=str)
-        
+
         # Create a hash object with the specified algorithm
         hash_object = hashlib.new(hash_algorithm)
-        
+
         # Update the hash object with the JSON string (encoded to bytes)
-        hash_object.update(json_string.encode('utf-8'))
-        
+        hash_object.update(json_string.encode("utf-8"))
+
         # Return the hexadecimal representation of the hash
-        return hash_object.hexdigest()    
+        return hash_object.hexdigest()
+
 
 @dataclass
 class State:
     messages: list[OpenAIMessage]
-    
+
     def __init__(self):
         self.messages = []
-        
+
     def __repr__(self) -> str:
         return str_msgs(self.messages[1:])
+
 
 @dataclass
 class AgentSettings:
     # litellm model name. Refer to https://docs.litellm.ai/docs/providers.
     model: str
-    
-    # API key env variable name. 
+
+    # API key env variable name.
     # If not provided, defaults to <MODEL_PROVIDER>_API_KEY format
     api_key: Optional[str] = None
-    
+
     # hyperparam dictionary in OpenAI format, eg. { 'temperature': 0.8 }
     hyperparams: Optional[dict[str, Any]] = None
-		
+
     # literal system prompt
     # if provided, template and template_params will be ignored
     system_prompt: Optional[str] = None
@@ -102,28 +102,29 @@ class AgentSettings:
 
     # json_mode for the response format
     json_mode: Optional[bool] = False
-    
+
     # user or assistant
-    role: str = 'assistant'
-    
+    role: str = "assistant"
+
     def resolve_response_format(self) -> str:
-        if self.json_mode: 
-            return { 'type': "json_object" }
+        if self.json_mode:
+            return {"type": "json_object"}
         return None
-    
+
     def resolve_system_prompt(self) -> str:
-        prompt_to_render = ''
+        prompt_to_render = ""
         system_prompt = self.system_prompt
         template = self.template
-        if system_prompt == None:
-            if template == None:
-                raise ValueError("Either system_prompt or template must be provided in the model settings")
+        if system_prompt is None:
+            if template is None:
+                raise ValueError(
+                    "Either system_prompt or template must be provided in the model settings"
+                )
             else:
                 prompt_to_render = self.resolve_prompt_template(template)
         else:
             prompt_to_render = system_prompt
-        
-        
+
         jinja_template = Template(prompt_to_render)
         template_params = self.template_params
 
@@ -133,25 +134,25 @@ class AgentSettings:
             raise ValueError("Prompt params must be a dictionary")
         elif not all([type(k) == str for k in template_params.keys()]):
             raise ValueError("Prompt params keys must be strings")
-        
+
         # ensure that values are all strings
         for k, v in template_params.items():
             if type(k) != str:
                 raise ValueError("Prompt params keys must be strings")
             if type(v) != str:
                 template_params[k] = str(v)
-        
+
         # try to render the template
         try:
             render = jinja_template.render(template_params)
         except Exception as e:
             raise ValueError(f"Error rendering system prompt: {e}")
-        
+
         return render
-    
+
     def resolve_prompt_template(self, template_name_or_template: str):
         try:
-            with open('src/realign/templates.yaml', 'r') as f:
+            with open("src/realign/templates.yaml", "r") as f:
                 prompts = yaml.load(f, Loader=yaml.FullLoader)
                 if template_name_or_template not in prompts:
                     return template_name_or_template
@@ -163,11 +164,14 @@ class AgentSettings:
     def validate_keys(self):
         # validate that the API keys are set
         model_key_validation = validate_environment(self.model)
-        if not model_key_validation['keys_in_environment']:
-            raise ValueError('Could not find the following API keys in the environment: {}'.format(
-                ','.join(model_key_validation['missing_keys'])))
-    
-    def copy(self) -> 'AgentSettings':
+        if not model_key_validation["keys_in_environment"]:
+            raise ValueError(
+                "Could not find the following API keys in the environment: {}".format(
+                    ",".join(model_key_validation["missing_keys"])
+                )
+            )
+
+    def copy(self) -> "AgentSettings":
         return AgentSettings(
             model=self.model,
             api_key=self.api_key,
@@ -176,50 +180,64 @@ class AgentSettings:
             template=self.template,
             system_prompt=self.system_prompt,
             json_mode=self.json_mode,
-            role=self.role
+            role=self.role,
         )
 
-    def with_template_params(self, template_params: dict[str, str]) -> 'AgentSettings':
+    def with_template_params(self, template_params: dict[str, str]) -> "AgentSettings":
         self.template_params = template_params
         return self
 
+
 def system_prompt_str(agent_settings: AgentSettings):
-    '''Returns the system prompt for the given agent settings'''
-    
-    string = ''
+    """Returns the system prompt for the given agent settings"""
+
+    string = ""
     if agent_settings.role == "user":
-        string = ' '.join(
-            (bcolors.HEADER + "\nUSER SYSTEM PROMPT\n\n", 
-            agent_settings.system_prompt, 
-            bcolors.ENDC)
+        string = " ".join(
+            (
+                bcolors.HEADER + "\nUSER SYSTEM PROMPT\n\n",
+                agent_settings.system_prompt,
+                bcolors.ENDC,
+            )
         )
     elif agent_settings.role == "assistant":
-        string = ' '.join(
-            (bcolors.HEADER + "\nASSISTANT SYSTEM PROMPT\n\n",
-            agent_settings.system_prompt,
-            bcolors.ENDC)
+        string = " ".join(
+            (
+                bcolors.HEADER + "\nASSISTANT SYSTEM PROMPT\n\n",
+                agent_settings.system_prompt,
+                bcolors.ENDC,
+            )
         )
     return string
 
+
 def str_msgs(messages: list[OpenAIMessage]):
-    string = ''
+    string = ""
     for m in messages:
         if m.role == "user":
-            string += '\n' + ' '.join(
+            string += "\n" + " ".join(
                 (bcolors.OKBLUE + "\n", m.role.upper(), "\n\n", m.content, bcolors.ENDC)
             )
         elif m.role == "assistant":
-            string += '\n' + ' '.join(
-                (bcolors.OKGREEN + "\n", m.role.upper(), "\n\n", m.content, bcolors.ENDC)
+            string += "\n" + " ".join(
+                (
+                    bcolors.OKGREEN + "\n",
+                    m.role.upper(),
+                    "\n\n",
+                    m.content,
+                    bcolors.ENDC,
+                )
             )
         elif m.role == "system":
             pass
     return string
 
+
 def print_run_id(run_id):
     print("-" * 100)
     print("RUN ID:", run_id)
     print("-" * 100)
+
 
 def swap_roles(messages: list[OpenAIMessage]) -> list[OpenAIMessage]:
     for message in messages:
@@ -229,20 +247,27 @@ def swap_roles(messages: list[OpenAIMessage]) -> list[OpenAIMessage]:
             message.role = "user"
     return messages
 
+
 def llm_call_resolve_agent_settings(
     agent_settings_or_name: Optional[Union[AgentSettings, dict, str]] = None,
-    agent_settings: Optional[Union[AgentSettings, dict]] = None, 
+    agent_settings: Optional[Union[AgentSettings, dict]] = None,
     agent_name: Optional[str] = None,
     **agent_settings_kwargs,
 ) -> AgentSettings:
-    
+
     # assert all types
-    assert isinstance(agent_settings_or_name, (AgentSettings, dict, str, type(None))), f"agent_settings_or_name type {type(agent_settings_or_name)} is invalid"
-    assert isinstance(agent_settings, (AgentSettings, dict, type(None))), f"agent_settings type {type(agent_settings)} is invalid"
-    assert isinstance(agent_name, (str, type(None))), f"agent_name type {type(agent_name)} is invalid"
-    
+    assert isinstance(
+        agent_settings_or_name, (AgentSettings, dict, str, type(None))
+    ), f"agent_settings_or_name type {type(agent_settings_or_name)} is invalid"
+    assert isinstance(
+        agent_settings, (AgentSettings, dict, type(None))
+    ), f"agent_settings type {type(agent_settings)} is invalid"
+    assert isinstance(
+        agent_name, (str, type(None))
+    ), f"agent_name type {type(agent_name)} is invalid"
+
     agent_settings_to_use = None
-    
+
     # First, check agent_settings_or_name
     if agent_settings_or_name is not None:
         if isinstance(agent_settings_or_name, AgentSettings):
@@ -250,39 +275,43 @@ def llm_call_resolve_agent_settings(
         elif isinstance(agent_settings_or_name, dict):
             agent_settings_to_use = AgentSettings(**agent_settings_or_name)
         elif isinstance(agent_settings_or_name, str):
-            agent_settings_to_use = get_agent_settings(agent_name=agent_settings_or_name)
-    
+            agent_settings_to_use = get_agent_settings(
+                agent_name=agent_settings_or_name
+            )
+
     # Then, check agent_settings
     if agent_settings_to_use is None and agent_settings is not None:
         if isinstance(agent_settings, AgentSettings):
             agent_settings_to_use = agent_settings
         elif isinstance(agent_settings, dict):
             agent_settings_to_use = AgentSettings(**agent_settings)
-    
+
     # Then, check agent_name
     if agent_settings_to_use is None and agent_name is not None:
         agent_settings_to_use = get_agent_settings(agent_name=agent_name)
-    
+
     # If still None, use default settings
     if agent_settings_to_use is None:
         agent_settings_to_use = AgentSettings(
             model="openai/gpt-4o-mini",
-            system_prompt="Be a good assistant.",
             role="assistant",
         )
-    
+
     # Apply any additional kwargs
     for key, value in agent_settings_kwargs.items():
         setattr(agent_settings_to_use, key, value)
-    
-    assert isinstance(agent_settings_to_use, AgentSettings), f"agent_settings_to_use type {type(agent_settings_to_use)} is invalid"
+
+    assert isinstance(
+        agent_settings_to_use, AgentSettings
+    ), f"agent_settings_to_use type {type(agent_settings_to_use)} is invalid"
     return agent_settings_to_use
 
+
 def llm_call_get_completion_params(
-    agent_settings: Optional[AgentSettings | dict[str, Any]] = None, 
-    messages: Optional[list[OpenAIMessage]] = None
+    agent_settings: Optional[AgentSettings | dict[str, Any]] = None,
+    messages: Optional[list[OpenAIMessage]] = None,
 ) -> dict:
-    
+
     # ensure that messages is a list of OpenAIMessages
     for i, m in enumerate(messages or []):
         if not isinstance(m, OpenAIMessage):
@@ -293,7 +322,7 @@ def llm_call_get_completion_params(
 
     # validate the keys
     agent_settings.validate_keys()
-    
+
     if len(messages) == 0:
         messages = [OpenAIMessage(role="system", content=system_prompt)]
     elif messages[0].role != "system":
@@ -327,8 +356,11 @@ def llm_call_get_completion_params(
         **hyperparams,
     }
 
+
 def llm_call_post_process_response(
-    agent_settings: AgentSettings, messages: list[OpenAIMessage], response: Optional[ModelResponse | Exception]
+    agent_settings: AgentSettings,
+    messages: list[OpenAIMessage],
+    response: Optional[ModelResponse | Exception],
 ) -> OpenAIMessage:
 
     # unswap roles for user
@@ -338,13 +370,15 @@ def llm_call_post_process_response(
     # process empty or error responses
     assert response is not None, "Received empty response."
     if isinstance(response, Exception):
-        print(f"API call for {agent_settings.model} failed: {response}. Returning string 'error' and continuing.")
+        print(
+            f"API call for {agent_settings.model} failed: {response}. Returning string 'error' and continuing."
+        )
         # some models require an alternate user / assistant dialog
         if len(messages) == 0 or messages[-1].role != "user":
             return OpenAIMessage(role="user", content="error")
         else:
-            return OpenAIMessage(role='assistant', content="error")
-    
+            return OpenAIMessage(role="assistant", content="error")
+
     raw_message = response.choices[0].message
     response_message = OpenAIMessage(
         role=raw_message["role"], content=raw_message["content"]
@@ -354,25 +388,63 @@ def llm_call_post_process_response(
 
     return response_message
 
+def get_or_create_eventloop():
+    try:
+        return asyncio.get_event_loop()
+    except RuntimeError as ex:
+        if "There is no current event loop in thread" in str(ex):
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            return loop
+        raise
+
 def llm_messages_call(
-    agent_settings: Optional[AgentSettings], messages: list[OpenAIMessage] = []
+    agent_settings_or_name: Optional[Union[AgentSettings, dict, str]] = None,
+    agent_settings: Optional[Union[AgentSettings, dict]] = None,
+    agent_name: Optional[str] = None,
+    messages: list[OpenAIMessage] | list[dict[str, str]] = [],
+    **agent_settings_kwargs,
 ) -> OpenAIMessage:
-    raise NotImplementedError
+    
+    # resolve the agent settings
+    agent_settings = llm_call_resolve_agent_settings(
+        agent_settings_or_name=agent_settings_or_name,
+        agent_settings=agent_settings,
+        agent_name=agent_name,
+        **agent_settings_kwargs,
+    )
+
+    # get the params
+    params = llm_call_get_completion_params(agent_settings, messages)
+
+    # call the LLM using the router
+    response: ModelResponse = router.completion(**params)
+
+    # post process the response
+    message: OpenAIMessage = llm_call_post_process_response(
+        agent_settings, messages, response
+    )
+
+    return message
+
 
 async def allm_messages_call(
     agent_settings_or_name: Optional[Union[AgentSettings, dict, str]] = None,
-    agent_settings: Optional[Union[AgentSettings, dict]] = None, 
+    agent_settings: Optional[Union[AgentSettings, dict]] = None,
     agent_name: Optional[str] = None,
     messages: list[OpenAIMessage] | list[dict[str, str]] = [],
     **agent_settings_kwargs,
 ) -> OpenAIMessage:
     """Make an LLM call with provided agent_settings and messages"""
-    
+
     # resolve the agent settings
-    agent_settings = llm_call_resolve_agent_settings(agent_settings_or_name=agent_settings_or_name, 
-                                                    agent_settings=agent_settings, 
-                                                    agent_name=agent_name,
-                                                    **agent_settings_kwargs)
+    agent_settings = llm_call_resolve_agent_settings(
+        agent_settings_or_name=agent_settings_or_name,
+        agent_settings=agent_settings,
+        agent_name=agent_name,
+        **agent_settings_kwargs,
+    )
+    
 
     # get the params
     params = llm_call_get_completion_params(agent_settings, messages)
@@ -387,28 +459,37 @@ async def allm_messages_call(
 
     return message
 
+
+
 async def aembed_text(text: str, **kwargs):
     if "dimensions" not in kwargs:
         kwargs["dimensions"] = 512
     response = await aembedding("text-embedding-3-small", input=text, **kwargs)
     return response
 
+
 def messages_to_string(messages: list[OpenAIMessage]) -> str:
     """Convert a list of messages to a string"""
     return "\n".join([m.role + ":\n" + m.content for m in messages])
 
-def get_agent_settings(yaml_file: Optional[str] = None,
-                       agent_name: Optional[str] = None) -> dict[str, AgentSettings] | AgentSettings:
-    
+
+def get_agent_settings(
+    yaml_file: Optional[str] = None, agent_name: Optional[str] = None
+) -> dict[str, AgentSettings] | AgentSettings:
+
     parsed_yaml = load_yaml_settings(yaml_file)
 
-    if not isinstance(parsed_yaml, dict) or 'llm_agents' not in parsed_yaml:
-        raise ValueError("Invalid YAML structure. Expected 'llm_agents' key at the root level.")
+    if not isinstance(parsed_yaml, dict) or "llm_agents" not in parsed_yaml:
+        raise ValueError(
+            "Invalid YAML structure. Expected 'llm_agents' key at the root level."
+        )
 
-    assert isinstance(parsed_yaml['llm_agents'], dict), "llm_agents must be a dictionary"
+    assert isinstance(
+        parsed_yaml["llm_agents"], dict
+    ), "llm_agents must be a dictionary"
 
     agent_settings = {}
-    for _agent_name, settings in parsed_yaml['llm_agents'].items():
+    for _agent_name, settings in parsed_yaml["llm_agents"].items():
         agent_settings[_agent_name] = AgentSettings(**settings)
 
     if agent_name is not None:
@@ -418,14 +499,13 @@ def get_agent_settings(yaml_file: Optional[str] = None,
 
     return agent_settings
 
+
 def get_realign_llm_utils_globals():
     try:
         from realign.llm_utils import allm_messages_call
     except ImportError:
         raise
-    
-    return {
-        'allm_messages_call': allm_messages_call,
-    }
 
-# realign._eval_funcs.update(get_realign_llm_utils_globals())
+    return {
+        "allm_messages_call": allm_messages_call,
+    }

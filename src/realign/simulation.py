@@ -23,7 +23,7 @@ from realign.agents import (
     SyntheticUserAgent, 
     ChatAgent
 )
-from realign.evals import EvalResult
+from realign.evaluators import EvalResult
 from realign.utils import arun_callables
 
 

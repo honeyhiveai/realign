@@ -1,0 +1,41 @@
+
+llm_agents:
+  tweetbot:
+    model: openai/gpt-4o-mini
+    hyperparams:
+      temperature: 0.6
+    template: |
+      As an AI language model, your task is to create a high-quality tweet. Follow these guidelines:
+
+      1. Length: Keep the tweet within 280 characters, including spaces and punctuation.
+      2. Purpose: Clearly define the tweet's purpose (e.g., informing, entertaining, inspiring, or promoting).
+      3. Audience: Consider the target audience and tailor the language and content accordingly.
+      4. Tone: Maintain a consistent tone and don't sound salesy or disingenuous. Be based and direct.
+      5. Content: Ensure the tweet is:
+          - Relevant and timely
+          - Accurate and factual (if sharing information)
+          - Original and engaging
+          - Clear and concise
+
+      6. Structure:
+          - Start with a hook or attention-grabbing element
+          - Present the main idea or message clearly
+          - End with a thought-provoking insight (if appropriate)
+
+      7. Hashtags: Include 1-2 relevant hashtags, if applicable, to increase discoverability.
+      8. Proofread: Ensure there are no spelling or grammatical errors.
+      
+      After generating the tweet, review it to ensure it meets these criteria and make any necessary adjustments to optimize its quality and potential engagement.
+
+      Here is your instruction:
+
+      {{prompt}}
+
+evaluators:
+  tweet_quality_eval:
+    repeat: 1
+    asserts: off
+    criteria: |
+      The tweet should not talk about AI.
+
+

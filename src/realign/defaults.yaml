@@ -3,58 +3,43 @@ llm_agents:
   default: &basic_agent_settings
     model: openai/gpt-4o-mini
     system_prompt: |
-      What's the capital of France?
+      Be a good agent.
 
-  eval_gen:
+  rating_5_star_agent: &rating_5_star_agent
     model: openai/gpt-4o-mini
-    template: |
-      You are an LLM Evaluation Scientist.
-      Your task is to process a summary of an LLM application, and generate evaluation metrics for it. 
-      Given the user input {{input}}, 
+    template: rating_5_star
+    json_mode: on
+    hyperparams:
+      temperature: 0.5
+
+  explanation_summary_agent: &explanation_summary_agent
+    model: openai/gpt-4o-mini
+    template: explanation_summary
+    json_mode: on
+    hyperparams:
+      temperature: 0
 
 evaluators:
-  pymean:
-    weight: 1.0
+
+  hf_hate_speech:
+    model: facebook/roberta-hate-speech-dynabench-r4-target
+    task: text-classification
     repeat: 2
-    asserts: off
+    aggregate: hf_label_score_aggregator(values)
+    checker: value['best_label'] in target
+    target: [nothate]
+    asserts: on
 
-  npmean:
-    weight: 1.0
-    asserts: off
-    
-  numrange:
-    weight: 5.0
-    # asserts: on
-    target: (,10)
-
-  fourtytwo:
-    weight: 7.0
+  hf_sentiment_classifier:
+    task: text-classification
+    model: cardiffnlp/twitter-roberta-base-sentiment-latest
     repeat: 2
-    asserts: off
-    transform: result + 32
-    aggregate: sum(values)/len(values)
+    aggregate: hf_label_score_aggregator(values)
+    checker: value['best_label'] in target
+    target: [positive, neutral]
+    asserts: on
 
-  custom_eval:
-    weight: 13.0
-    repeat: 1
-    asserts: off
-    transform: insert_noise(value) # result is between 37 and 49
-    aggregate: min(pymean(values), 5) # 42
-    checker: numrange
-    target: (,40)
-
-  composite:
-    weight: 1.0
+  llm_rating_json:
     repeat: 3
-    asserts: off
-    transform: fourtytwo(value)
-    aggregate: weighted_mean(*values, *results)
-    checker: numrange
-    target: (0,9)
-
-
-  simple_add:
-    weight: 8
-    transform: int(value == 45) + 1
-    repeat: 2
-    aggregate: weighted_mean(values, results)
+    aggregate: llm_rating_json_aggregate(values)
+    agent_settings: *rating_5_star_agent
