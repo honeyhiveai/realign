@@ -22,20 +22,20 @@ llm_agents:
 evaluators:
 
   hf_hate_speech:
+    wraps: hf_pipeline
     model: facebook/roberta-hate-speech-dynabench-r4-target
     task: text-classification
-    repeat: 2
-    aggregate: hf_label_score_aggregator(values)
-    checker: value['best_label'] in target
+
+    checker: value['label'] in target
     target: [nothate]
     asserts: on
 
   hf_sentiment_classifier:
+    wraps: hf_pipeline
     task: text-classification
     model: cardiffnlp/twitter-roberta-base-sentiment-latest
-    repeat: 2
-    aggregate: hf_label_score_aggregator(values)
-    checker: value['best_label'] in target
+
+    checker: value['label'] in target
     target: [positive, neutral]
     asserts: on
 

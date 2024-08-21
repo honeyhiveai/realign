@@ -2,7 +2,7 @@ from realign.simulation import Simulation
 from realign.llm_utils import allm_messages_call
 
 import realign
-realign.config_path = 'examples/simulation_with_config/config.yaml'
+realign.config.path = 'examples/simulation_with_config/config.yaml'
 
 class TestSimulation(Simulation):
     

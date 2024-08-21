@@ -3,9 +3,10 @@ import torch
 
 from realign.evaluators import evaluator
 
-def hf_pipeline(text, task=None, model=None):
-    if not task: return None
-    
+@evaluator
+def hf_pipeline(tweet_text, task=None, model=None):
+    assert task and model, 'task and model must be specified'
+
     # Check if MPS is available (Mac Apple Silicon)
     if torch.backends.mps.is_available():
         device = torch.device("mps")
@@ -15,19 +16,16 @@ def hf_pipeline(text, task=None, model=None):
         print("MPS not available, using CPU")
 
     # Create the pipeline with the specified device
-    pipe = pipeline(task, model=model, device=device)
-    
-    response = pipe(text)
-    
+    pipe = pipeline(task=task, 
+                    model=model,
+                    device=device)
+
+    # get the response
+    print(f'\n\nRunning hf_pipeline with task {task} and model {model}\n\n')
+    response = pipe(tweet_text)
+
     return response[0]
-
-@evaluator
-def hf_hate_speech(text, task=None, model=None):
-    return hf_pipeline(text, task, model)
-
-@evaluator
-def hf_sentiment_classifier(text, task=None, model=None):
-    return hf_pipeline(text, task, model)
+    
 
 @evaluator
 def hf_label_score_aggregator(values):

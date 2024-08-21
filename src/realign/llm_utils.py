@@ -13,7 +13,7 @@ from litellm import ModelResponse, aembedding, acompletion, validate_environment
 import litellm
 
 from realign.router import Router
-from realign.config import load_yaml_settings
+from realign.configs import load_yaml_settings
 from realign.utils import bcolors, run_async
 
 
