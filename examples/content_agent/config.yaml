@@ -84,9 +84,3 @@ llm_agents:
         4. Don't make general claims.
         5. Don't start with a question.
     json_mode: on
-
-evaluators:
-  bert_classifier:
-    target: 5
-    model: hf/bert
-    template: rating_5_star

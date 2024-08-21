@@ -49,12 +49,17 @@ OPENAI_API_KEY="your_openai_key"
 
 
 
-
-
 # Tutorials
 
 Realign is a tool to test and evaluate your LLM agents blazing fast. We'll provide you with the rools to make 100s of LLM calls in parallel, with ANY model.
 
+
+[Introduction to LLM Agents](#introduction-to-llm-agents)
+1. [Simple Tweet Bot](#simple-tweet-bot)
+2. [Generate 10 Tweets in Parallel (Async)](#generate-10-tweets-in-parallel-async)
+3. [Using Config Files](#using-config-files)
+4. [Set up Evaluators](#set-up-evaluators)
+5. [Using Realign Evaluators](#using-realign-evaluators)
 
 
 ### Introduction to LLM Agents
@@ -450,16 +455,13 @@ llm_agents:
 
 
 
-### Set up Evaluators
+### Set up Evaluators with Config Files
 
 Now that you have a Tweet agent that can generate tweets quickly, you might want to evaluate the responses to get make sure the quality is high. To do this, we can set up evaluators.
-
-
 
 But what is an evaluator?
 
 > An **Evaluator** is a function which *scores* your app's output and *checks* if the score is within a *target* range.
-
 
 
 There are a few ways to implement Evaluators:
@@ -545,7 +547,7 @@ def hate_speech_detection(tweet_text):
 
 This will return something like
 
-```json
+```python
 [{'label': 'nothate', 'score': 0.9998}]
 ```
 
@@ -592,10 +594,9 @@ Feeling icky with all the code duplication? In Realign, we can pull out all the 
 
 
 
-### Using Realign Evaluators
+#### Using Realign Evaluators
 
 In Realign, any Python function can be converted to an Evaluator using the `@evaluator` decorator. If your function is async, you can use the `@aevaluator` decorator. 
-
 
 
 In our case, Realign @evaluator can help you create a wrapper around a base implementation of Huggingface pipeline, abstracting out any hyperparams you like. 

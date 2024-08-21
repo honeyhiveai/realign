@@ -1,10 +1,11 @@
 from realign.simulation import Simulation
 from realign.llm_utils import allm_messages_call
+from realign.evaluators import evaluator
 
 import realign
 realign.config.path = 'examples/simulation_with_config/config.yaml'
 
-class TestSimulation(Simulation):
+class TweetBot(Simulation):
     
     async def setup(self):
         
@@ -18,7 +19,11 @@ class TestSimulation(Simulation):
         self.tweet_prompt = message.content
         print('tweet_prompt', self.tweet_prompt)
         
-        # self.evaluators = [evaluator(len)]
+        self.evaluators = evaluator[
+            'hf_hate_speech', 
+            'hf_sentiment_classifier'
+        ]
+        
         self.tweet_prompt = 'Write a post on the negative impacts of AI'
 
     async def main(self, run_context) -> None:
@@ -38,5 +43,5 @@ class TestSimulation(Simulation):
         return message.content
 
 
-sim = TestSimulation()
-sim.run(10)
+sim = TweetBot()
+sim.run(3)

@@ -41,7 +41,6 @@ async def tweet(prompt, i):
     print(tweet_quality_eval.prev_run)
 
 
-
 def main(prompt):
     
     tasks = []

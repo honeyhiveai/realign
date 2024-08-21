@@ -2,8 +2,8 @@ import asyncio
 import json
 import os
 import inspect
-from typing import Any, Self, Callable, Coroutine
-from dataclasses import dataclass
+from typing import Any, Self, Callable, Coroutine, Optional
+from dataclasses import dataclass, field
 
 from dotenv import load_dotenv
 
@@ -23,19 +23,19 @@ from realign.agents import (
     SyntheticUserAgent, 
     ChatAgent
 )
-from realign.evaluators import EvalResult
-from realign.utils import arun_callables
+from realign.evaluators import evaluator, EvalResult
+from realign.utils import arun_callables, bcolors
 
 
 @dataclass
 class Context:
     run_id: int
     
-    initial_state: State = None
-    final_state: State = None
+    initial_state: Optional[State] = None
+    final_state: Optional[State] = None
     
-    run_data: RunData = None
-    eval_results: list[EvalResult] = None
+    run_data: Optional[RunData] = None
+    eval_results: list[EvalResult] = field(default_factory=list)
 
 class Simulation:
     
@@ -58,7 +58,7 @@ class Simulation:
         # simulation components accessible to main
         self.dataset: Dataset = None
         self.app: AbstractAgent = None
-        self.evaluators: list[Callable] = []
+        self.evaluators: list[Callable | evaluator] = []
         
     async def before_each(self, run_context: Context):
         '''Runs asyncronously before each simulation run'''
@@ -71,12 +71,24 @@ class Simulation:
         '''Runs synchronously after each simulation run'''
         
         if self.evaluators and len(self.evaluators) > 0:
-            evals: list[EvalResult] = await arun_callables(funcs=self.evaluators, 
-                                                           args=[[run_context.final_state]])
+            
+            # NOTE: final_state is assumed to be read only
+            args = [(run_context.final_state,) for _ in range(len(self.evaluators))]
+            
+            eval_scores = await arun_callables(funcs=self.evaluators,
+                                         args=args)
             
             # save the evaluation results
-            run_context.eval_results = evals
-            print_run_id(run_context.run_id)
+            run_context.eval_results = eval_scores
+            
+            for e in range(len(self.evaluators)):
+                if isinstance(self.evaluators[e], evaluator) and isinstance(self.evaluators[e].prev_run, EvalResult):
+                    # results
+                    run_context.eval_results[e] = self.evaluators[e].prev_run.copy()
+                else:
+                    # scores
+                    run_context.eval_results[e] = eval_scores[e]
+            
         else:
             run_context.eval_results = []
         
@@ -86,41 +98,12 @@ class Simulation:
         
         # aggregate the results
         for run_id in range(self.runs):
-            self.run_data[run_id] = self.thread_contexts[run_id].run_data
-            self.eval_results[run_id] = self.thread_contexts[run_id].eval_results
+            self.run_data[run_id] = self.run_contexts[run_id].run_data
+            self.eval_results[run_id] = self.run_contexts[run_id].eval_results
             
         self.push_runs_to_dataset()
-        self.push_evals_dataset()
+        self.push_evals_dataset()     
     
-    async def coroutine_with_evals(self, run_id: int) -> Any:
-
-        # run the simulation main
-        final_state = await self.main(run_id)
-
-        # wrap the simulation run as an object
-        sim_run_data = RunData(final_state, run_id=run_id)
-        
-        # save the run data
-        self.run_data[run_id] = sim_run_data
-        
-        # print the eval results
-        if self.evaluators and len(self.evaluators) > 0:
-
-            # run the evaluators  
-            eval_tasks = []
-            for eval_func in self.evaluators:
-                # pass object reference to the @evaluator decorator
-                eval_tasks.append(asyncio.create_task(eval_func(sim_run_data)))
-
-            # await all the evaluators
-            evals: list[EvalResult] = await asyncio.gather(*eval_tasks)
-            
-            # save the evaluation results
-            self.eval_results[run_id] = evals
-
-            print_run_id(run_id)
-            # print_evals(evals)
-        
     async def run_concurrently(self, run_context: Context):
         
         # before_each
@@ -141,14 +124,14 @@ class Simulation:
         
         try:
             # set up the thread contexts
-            self.thread_contexts: list[Context] = [Context(run_id) for run_id in range(self.runs)]
+            self.run_contexts: list[Context] = [Context(run_id) for run_id in range(self.runs)]
             
             # setup
             await self.setup()
             
             # before_each, main, after_each
             simulation_run_tasks = [
-                self.run_concurrently(self.thread_contexts[run_id])
+                self.run_concurrently(self.run_contexts[run_id])
                 for run_id in range(self.runs)
             ]
             await asyncio.gather(*simulation_run_tasks)
@@ -165,17 +148,20 @@ class Simulation:
 
             # end timer
             end = asyncio.get_event_loop().time()
+            
+            for run_id in range(self.runs):
+                print_run_id(run_id)
+                self.print_evals(self.run_contexts[run_id])
 
             print('\n\n' + '-'*100)
             print('Simulation Stats:')
             print(f'\tSimulation Duration: {(end - start):.3f} sec')
             print(f'\tRuns: {self.runs} runs')
-
             print('-'*100)
+            
             for model_name, model_stats in router_stats.items():
                 print(f'{model_name} Stats:')
                 print(json.dumps(model_stats, indent=4).replace('"', ''))
-            
             print('-'*100 + '\n\n')
 
     def run(self, runs: int = 3) -> Self:
@@ -201,6 +187,13 @@ class Simulation:
         
         return self
     
+    def print_evals(self, run_context: Context):
+        print(bcolors.WARNING)
+        for e in run_context.eval_results:
+            print(e)
+            print("- " * 50)
+        print(bcolors.ENDC)    
+    
     def export_run_data(self) -> dict:
         return_obj = {'inputs': [], 'outputs': [], 'ground_truths': [], 'metadata': []}    
         for run_id, run_data in self.run_data.items():
@@ -212,12 +205,14 @@ class Simulation:
     
     def export_eval_results(self) -> dict:
         data_obj = {'run_data_hash': [], 'metadata': [], 'evaluations': []}
-        for run_id, evals in self.eval_results.items():
+        for run_id, eval_results in self.eval_results.items():
             data_obj['run_data_hash'].append(self.run_data[run_id].compute_hash())
             eval_dict = dict()
-            for eval_obj in evals:
-                if isinstance(eval_obj, EvalResult):
-                    eval_dict |= eval_obj.to_dict()
+            for i, e in enumerate(eval_results):
+                if isinstance(e, EvalResult):
+                    eval_dict[e.func_impl] = e.str
+                else:
+                    eval_dict[i] = e
             data_obj['evaluations'].append(eval_dict)
         return data_obj
     

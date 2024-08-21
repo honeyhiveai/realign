@@ -98,10 +98,13 @@ def get_eval_settings(
 
     parsed_yaml = load_yaml_settings(yaml_file)
 
-    if not isinstance(parsed_yaml, dict) or "evaluators" not in parsed_yaml:
+    if not isinstance(parsed_yaml, dict):
         raise ValueError(
-            "Invalid YAML structure. Expected 'evaluators' key at the root level."
+            "Invalid YAML structure."
         )
+    
+    if "evaluators" not in parsed_yaml:
+        return dict(), dict()
 
     assert isinstance(
         parsed_yaml["evaluators"], dict
@@ -164,7 +167,9 @@ class EvalResult:
         if self.func_impl is not None:
             result += f'{" " * (indent + 4)}func_impl: {self.func_impl}\n'
         if self.func_args and len(self.func_args) > 0:
-            result += f'{" " * (indent + 4)}func_args: {self.func_args}\n'
+            if len(self.func_args) == 1:
+                func_args = self.func_args[0]
+            result += f'{" " * (indent + 4)}func_args: \n{bcolors.OKGREEN}{func_args}{bcolors.ENDC}\n'
         if self.func_kwargs and len(self.func_kwargs) > 0:
             result += f'{" " * (indent + 4)}func_kwargs: {self.func_kwargs}\n'
         if self.call_depth > 0:
@@ -247,6 +252,12 @@ class EvalResult:
         self.trace()
         return self.str
 
+    def copy(self) -> "EvalResult":
+        copy_result = EvalResult(score=self.score,
+                          init_method=self.init_method,
+                          **self.metadata)
+        copy_result.str = self.trace()
+        return copy_result
 
 # map of task_id to context
 call_context: dict[str, Any] = {"depth": 0, "calls": []}
@@ -817,12 +828,19 @@ class evaluator:
             raise KeyError(f"Invalid key type: {type(key)}")
 
     @classmethod
-    def __class_getitem__(cls, key: str | Callable) -> "evaluator":
-        key = cls._validate_key(key)
-        if key in cls.all_evaluators:
-            return cls.all_evaluators[key]
+    def __class_getitem__(cls, keys):
+        if isinstance(keys, (str, Callable)):
+            # Single key access
+            key = cls._validate_key(keys)
+            if key in cls.all_evaluators:
+                return cls.all_evaluators[key]
+            else:
+                raise KeyError(f"Key '{key}' not found in evaluators.")
+        elif isinstance(keys, tuple):
+            # Multiple key access
+            return [cls.__class_getitem__(key) for key in keys]
         else:
-            raise KeyError(f"Key '{key}' not found in evaluators.")
+            raise KeyError(f"Invalid key type: {type(keys)}")
 
     @classmethod
     def __class_setitem__(cls, key, value):
@@ -875,14 +893,5 @@ from realign import evallib
 
 realign.config.path = "src/realign/defaults.yaml"
 
-# ------------------------------------------------------------------------------
-# PRINTING
-# ------------------------------------------------------------------------------
 
 
-def print_evals(evals: list[EvalResult]):
-    print(bcolors.WARNING)
-    for e in evals:
-        print(e)
-        print("- " * 50)
-    print(bcolors.ENDC)

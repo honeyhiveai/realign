@@ -12,20 +12,35 @@ class bcolors:
     BOLD = "\033[1m"
     UNDERLINE = "\033[4m"
 
-async def arun_callables(funcs: list[Callable], args: list[list] = [[]], kwargs: list[dict] = [{}]) -> list[Any]:
+async def arun_callables(funcs: list[Callable], args: list[list] = [[]], kwargs: list[dict] = None) -> list[Any]:
     
-    if len(funcs) != len(args) or len(funcs) != len(kwargs):
-        raise Exception("funcs, args, and kwargs must all be the same length.")
+    if len(funcs) != len(args):
+        raise Exception("funcs and args must be the same length.")
+    
+    if kwargs:
+        if len(funcs) != len(kwargs):
+            raise Exception("funcs, args, and kwargs must all be the same length.")
+    else:
+        # empty kwargs
+        kwargs = [dict() for _ in range(len(funcs))]
 
-    async def run_func(func, arg, kwarg):
+    async_tasks = []
+    sync_tasks = []
+    for func, arg, kwarg in zip(funcs, args, kwargs):
         if asyncio.iscoroutinefunction(func):
-            return await func(*arg, **kwarg)
+            async_tasks.append(func(*arg, **kwarg))
         else:
-            return await asyncio.to_thread(func, *arg, **kwarg)
+            sync_tasks.append((func, arg, kwarg))
 
-    tasks = [run_func(func, arg, kwarg) for func, arg, kwarg in zip(funcs, args, kwargs)]
+    # run the async tasks in parallel
+    async_results = await asyncio.gather(*async_tasks)
     
-    results = await asyncio.gather(*tasks)
+    # run the sync tasks in serial
+    sync_results = []
+    for func, arg, kwarg in sync_tasks:
+        sync_results.append(func(*arg, **kwarg))
+    # combine the async and sync results
+    results = async_results + sync_results
     return results
 
 
