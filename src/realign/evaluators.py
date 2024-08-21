@@ -3,6 +3,7 @@ from dataclasses import dataclass, fields
 from typing import Any, Optional, Callable, Coroutine, Awaitable
 import inspect
 import functools
+import os
 
 import realign
 from realign.configs import load_yaml_settings
@@ -271,7 +272,7 @@ class evaluator:
 
     all_evaluators: dict[str, "evaluator" | Callable | Coroutine | None] = dict()
     all_eval_settings, all_eval_kwargs = get_eval_settings(
-        yaml_file=realign.config.path
+        yaml_file=os.path.join(os.path.dirname(__file__), realign.config.path)
     )
 
     def __unnamed__(self, *args, **kwargs):
@@ -891,7 +892,4 @@ class aevaluator(evaluator):
 # instantiate all decorated evaluators in evallib
 from realign import evallib
 
-realign.config.path = "src/realign/defaults.yaml"
-
-
-
+realign.config.path = os.path.join(os.path.dirname(__file__), 'defaults.yaml')

@@ -6,7 +6,7 @@ import asyncio
 import realign
 
 
-DEFAULT_CONFIG_PATH = "src/realign/defaults.yaml"
+DEFAULT_CONFIG_PATH = "defaults.yaml"
 
 # Export the config_path property for easy access
 config_path = DEFAULT_CONFIG_PATH
@@ -17,8 +17,6 @@ class Config:
         self._config_path = DEFAULT_CONFIG_PATH
 
     def __set__(self, _, path):
-
-        print(f"Loading config from {path}")
 
         if not os.path.exists(path):
             raise FileNotFoundError(f"Config file not found at {path}")
@@ -114,6 +112,7 @@ class Config:
                     all_eval_kwargs[eval_name]
                 )
 
+        # update the config path
         print("Loaded config file:", self._config_path)
 
 

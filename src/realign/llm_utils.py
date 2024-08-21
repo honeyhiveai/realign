@@ -152,7 +152,8 @@ class AgentSettings:
 
     def resolve_prompt_template(self, template_name_or_template: str):
         try:
-            with open("src/realign/templates.yaml", "r") as f:
+            template_path = os.path.join(os.path.dirname(__file__), "src/realign/templates.yaml")
+            with open(template_path, "r") as f:
                 prompts = yaml.load(f, Loader=yaml.FullLoader)
                 if template_name_or_template not in prompts:
                     return template_name_or_template

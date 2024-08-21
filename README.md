@@ -50,7 +50,7 @@ OPENAI_API_KEY="your_openai_key"
 
 
 # Tutorials
-[Tutorials](docs/tutorials.md)
+[Tutorials](docs/TUTORIALS.md)
 
 
 # Concepts

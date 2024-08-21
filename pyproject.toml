@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "realign"
-version = "0.1.30"
+version = "0.1.34"
 dependencies = [
     "litellm",
     "jinja2",
@@ -45,4 +45,4 @@ Documentation = "https://docs.honeyhive.ai/"
 where = ["src"]
 
 [tool.setuptools.package-data]
-realign = ["persona-hub/*/*"]
+realign = ["persona-hub/*/*", "*.yaml"]

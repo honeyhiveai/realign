@@ -20,11 +20,6 @@ def compound_guardrail(text):
     
     return hate_speech_guardrail and sentiment_guardrail
 
-@aevaluator
-async def tweet_quality_eval(text, criteria=None):
-    return await aevaluator['llm_rating_json'](criteria, text)
-
-
 async def tweet(prompt, i):
     
     new_message = await allm_messages_call(
@@ -35,10 +30,7 @@ async def tweet(prompt, i):
     print(f'\nTweet {i+1}:\n\n', new_message.content, '\n\n')
     
     print('\n\nTweet character count:', tweet_char_count(new_message.content))
-    print('\n\nTweet quality score:', await tweet_quality_eval(new_message.content))
     print('\n\nCompound guardrail:', compound_guardrail(new_message.content))
-    
-    print(tweet_quality_eval.prev_run)
 
 
 def main(prompt):

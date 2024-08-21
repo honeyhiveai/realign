@@ -1,6 +1,7 @@
 
 from typing import Callable
 import inspect
+import warnings
 
 import itertools
 import math
@@ -16,10 +17,21 @@ from realign.evaluators import evaluator, EvalResult, EvalSettings
 # ------------------------------------------------------------------------------
 
 
-from realign.evallib.hf import *
-from realign.evallib.checkers import *
-from realign.evallib.stats import *
-from realign.evallib.llm import *
+def import_module(module_name):
+    try:
+        module = __import__(module_name, fromlist=['*'])
+        # Add all non-private attributes to the global namespace
+        globals().update({name: getattr(module, name) for name in dir(module) if not name.startswith('_')})
+        return module
+    except ImportError as e:
+        warnings.warn(f"Failed to import {module_name}: {str(e)}. Some functionality may be unavailable.")
+        return None
+
+# Attempt imports with warnings
+hf = import_module('realign.evallib.hf')
+checkers = import_module('realign.evallib.checkers')
+stats = import_module('realign.evallib.stats')
+llm = import_module('realign.evallib.llm')
 
 # ------------------------------------------------------------------------------
 # LOAD ALL EVALUATORS 

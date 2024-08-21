@@ -14,3 +14,4 @@ def weighted_sum(values, results: list[EvalResult]):
 def weighted_mean(values, results: list[EvalResult]):
 
     return weighted_sum(values, results) / sum(result.weight for result in results)
+
