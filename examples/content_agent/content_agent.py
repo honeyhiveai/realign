@@ -4,7 +4,7 @@ from learning_channel_exporter import fetch_and_write_messages
 from generate_info_bites import process_csv
 
 import realign
-realign.config_path = 'config.yaml'
+realign.config.path = 'config.yaml'
 
 from honeyhive.tracer import HoneyHiveTracer
 

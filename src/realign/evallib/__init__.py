@@ -27,7 +27,7 @@ from realign.evallib.llm import *
 
 EXCLUDE_GLOBALS = [
     'get_evallib_functions',
-    'get_realign_utils',
+    'get_realign_evals_utils',
     'get_python_globals',
     'evaluator',
     'load_static_eval_funcs',

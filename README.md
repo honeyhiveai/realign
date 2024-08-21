@@ -1,381 +1,872 @@
-![realign.png](site/realign_banner.png)
+# Realign: Evaluation & Experimentation Framework for AI Applications
 
-# AI Testing and Simulation Framework
+![realign_banner.png](site/realign_banner.png)
 
-Realign is a testing and simulation framework for AI applications. It simulates user interactions, evaluates AI performance, and generates adverserial test cases to red-team AI applications.
+`realign` is an evaluation and experimentation framework for building reliable AI applications through test-driven development. Test and evaluate agent architectures, RAG systems, prompts, and models across hundreds of scenarios specific to your use-case.
+
+
+
+### 🎯 With Realign, you can:
+
+- **Build reliable AI agents** and RAG systems with test suites tailored to your use-case
+- **Evaluate quality** by simulating your agents over hundreds of scenarios in parallel
+- **Experiment with 100+ models,** prompts, and other parameters to find optimal configurations
+- **Detect regressions** by integrating test suites with your CI/CD pipeline
+- **Track experiments** with HoneyHive for cloud-scale analytics, visualization, and reproducibility
+
+### 💡 What’s unique about Realign
+
+- **YAML-Driven DX:** Cleanly manage your agents, evaluator prompts, datasets, and other parameters using easy-to-read YAML config files
+- **Composable Evaluators:** Automatically evaluate quality using our library of 25+ pre-built evaluators, or create your own using composable building blocks
+- **Blazing Fast Execution:** Speed up your evaluations with parallel processing and async capabilities, with built-in modules for smart rate limiting
+- **Statistical Rigor:** Use statistics to test hypotheses and sweep hyperparameters to optimize performance
+
+
+
+# Quickstart
 
 ## Installation & Setup
 
 To install the package, run
 
-`pip install realign`
+```bash
+pip install realign
+```
+
+
 
 Set your API keys as environment variables:
 
-```sh
+```bash
 export OPENAI_API_KEY="your_openai_key"
 ```
 
 or put them in a `.env` file:
 
-```sh
+```bash
 OPENAI_API_KEY="your_openai_key"
 ```
 
-## Why We Built Realign
 
-Testing multi-turn AI applications is hard. Here's why:
 
-1. **Context Dependence**: In a multi-turn interaction, each response depends on the conversation history. Static test cases cannot capture this complexity.
-2. **Diverse Scenarios**: Real users behave unpredictably. It's impossible to manually write test cases for every scenario.
-3. **Evolving Conversations**: As conversations progress, they can drift from their original topic or intent. Detecting and evaluating these shifts pre-production is crucial.
-4. **Compounding Errors**: Small mistakes in early turns can lead to larger issues later. Identifying these patterns requires analyzing full conversation trajectories.
 
-Realign addresses these challenges by:
 
-- Simulating dynamic user behavior in real-time using LLMs
-- Automatically generating adverserial test cases, user personas, and scenarios using LLMs
-- Evaluating entire conversation flows, not just individual responses, using LLMs, binary classifiers, and more
-- Allowing custom evaluation criteria for domain-specific use cases
+# Tutorials
 
-## Key Features
+Realign is a tool to test and evaluate your LLM agents blazing fast. We'll provide you with the rools to make 100s of LLM calls in parallel, with ANY model.
 
-1. Simulate user interactions over multiple turns
-2. Run component-level evaluations on specific steps, turns, and entire conversation trajectories
-3. Synthetically generate test cases and simulation scenarios
-4. Run tests and simulations locally or in CI/CD pipelines
-5. Define custom evaluators aligned with your domain and use-case
 
-## Quickstart
+
+### Introduction to LLM Agents
+
+#### Simple Tweet Bot
+
+Let's start by creating a simple Twitter (X?) bot:
+
+```python
+from realign.llm_utils import llm_messages_call
+
+def tweetbot(prompt: str) -> str:
+    
+    new_message = llm_messages_call(
+        messages=[{
+            "role": "user", 
+            "content": prompt
+        }],
+    )
+
+    print('\nTweet:\n\n', new_message.content, '\n\n')
+    
+tweetbot("Write a tweet about best practices for prompt engineering")
+```
+
+You should get something that looks like this:
+
+```
+Created model router for openai/gpt-4o-mini
+Successfully called openai/gpt-4o-mini in 1.151 seconds.
+
+Tweet:
+
+ 🔍✨ Best practices for prompt engineering:
+
+1️⃣ Be specific: Clearly define your objectives.
+2️⃣ Iterative testing: Refine prompts based on outputs.
+3️⃣ Context is key: Provide relevant background info.
+4️⃣ Experiment with formats: Questions, completion, or examples.
+5️⃣ Use constraints: Limit scope for focused responses.
+
+#PromptEngineering #AI #MachineLearning 
+```
+
+Great! The logs start by telling you which model you are using. The `model router` protects you from rate limits and handles retries.
+
+
+
+You must have noticed that the default model is `openai/gpt-4o-mini`. To change your model, simply enter a new model using `model=`.
+
+```python
+    new_message = llm_messages_call(
+        model='anthropic/claude-3-5-sonnet-20240620',
+        messages=[{
+            "role": "user", 
+            "content": prompt
+        }],
+    )
+```
+
+Realign leverages LiteLLM to help you plug in any model in a single line of code using the format `<provider>/<model>`. You can find their 100+ supported models [here](https://docs.litellm.ai/docs/providers).
+
+
+
+#### Generate 10 Tweets in Parallel (Async)
+
+Now let's assume you want to create 10 tweets and see which one looks best.
+
+
+
+You could do this by calling `llm_messages_call` 10 times. However, this would be slow. Let's try it:
+
+
+
+```python
+from realign.llm_utils import llm_messages_call
+import time
+
+
+def tweet(prompt, i):
+    
+    new_message = llm_messages_call(
+        messages=[{
+            "role": "user", 
+            "content": prompt
+        }],
+    )
+
+    print(f'\nTweet {i+1}:\n\n', new_message.content, '\n\n')
+
+
+def main(prompt):
+    for i in range(10):
+        tweet(prompt, i)
+    
+start_time = time.time()
+
+main("Write a tweet about best practices for prompt engineering")
+
+print(f'Total time: {time.time() - start_time:.2f} seconds')
+```
+
+
+
+You should see something like:
+
+```
+Created model router for openai/gpt-4o-mini
+Successfully called openai/gpt-4o-mini in 1.256 seconds.
+Successfully called openai/gpt-4o-mini in 1.445 seconds.
+Successfully called openai/gpt-4o-mini in 1.449 seconds.
+Successfully called openai/gpt-4o-mini in 1.448 seconds.
+Successfully called openai/gpt-4o-mini in 1.552 seconds.
+Successfully called openai/gpt-4o-mini in 1.554 seconds.
+Successfully called openai/gpt-4o-mini in 1.554 seconds.
+Successfully called openai/gpt-4o-mini in 1.600 seconds.
+Successfully called openai/gpt-4o-mini in 1.633 seconds.
+Successfully called openai/gpt-4o-mini in 1.906 seconds.
+
+Tweet 1:
+
+ 🚀✨ Best practices for prompt engineering: 
+
+1. **Be Clear
+
+... 10 tweets
+
+
+Total time: 15.58 seconds
+```
+
+It takes about 15 seconds because the API calls happen sequentially. To run these API calls in parallel, you can use the `allm_messages_call` method and `run_async` utility.
+
+```python
+from realign.llm_utils import allm_messages_call, run_async
+import time
+
+
+async def tweet(prompt, i):
+    
+    new_message = await allm_messages_call(
+        messages=[{
+            "role": "user", 
+            "content": prompt
+        }],
+    )
+
+    print(f'\nTweet {i+1}:\n\n', new_message.content, '\n\n')
+
+
+def main(prompt):
+    
+    tasks = []
+    for i in range(10):
+        tasks.append(tweet(prompt, i))
+
+    # run the tasks in parallel
+    run_async(tasks)
+    
+start_time = time.time()
+
+main("Write a tweet about best practices for prompt engineering")
+
+print(f'Total time: {time.time() - start_time:.2f} seconds')
+```
+
+
+
+You should see something like:
+
+```
+Created model router for openai/gpt-4o-mini
+openai/gpt-4o-mini Processing requests...
+Successfully called openai/gpt-4o-mini in 1.191 seconds.
+Successfully called openai/gpt-4o-mini in 1.374 seconds.
+Successfully called openai/gpt-4o-mini in 1.446 seconds.
+Successfully called openai/gpt-4o-mini in 1.476 seconds.
+Successfully called openai/gpt-4o-mini in 1.478 seconds.
+Successfully called openai/gpt-4o-mini in 1.575 seconds.
+Successfully called openai/gpt-4o-mini in 1.662 seconds.
+Successfully called openai/gpt-4o-mini in 1.944 seconds.
+Successfully called openai/gpt-4o-mini in 2.383 seconds.
+Successfully called openai/gpt-4o-mini in 2.467 seconds.
+
+Tweet 1:
+
+✨ Mastering prompt engineering? Here are some best practices! ✨
+
+... 10 tweets
+
+Total time: 2.47 seconds
+```
+
+
+
+The total time is now the time taken by the **longest API call** instead of the total time taken by all calls. This allows you to iterate much quicker!
+
+
+
+Here's a summary of the main changes compared to the synchronous run:
+
+- Change the method of `tweet` from `def` to `async def`. 
+
+- Change `llm_messages_call` to `allm_messages_call` which is the async version, and add the `await` keyword before it.
+
+- In the for loop, we add the outputs of the `tweet` calls to a `tasks` list. This contains our 10 scheduled tasks. These tasks are called **coroutines** in Python and are similar to promises in Javascript. More info on how coroutines work [here](#TODO).
+
+- Finally, we use the `run_async` utility which takes a single list of coroutines, and waits until they are all complete. If `tweet` returned something, the `run_async` function would return a list of returns.
+
+
+
+### Using Config Files
+
+#### Tweet Bot with Template
+
+You might want the Tweet to follow certain rules and patterns. To do this, we can use a prompt template:
+
+```python
+from realign.llm_utils import allm_messages_call, run_async
+
+async def tweet(prompt, i):
+    
+    new_message = await allm_messages_call(
+        messages=[{
+            "role": "user", 
+            "content": prompt
+        }],
+    )
+
+    print(f'\nTweet {i+1}:\n\n', new_message.content, '\n\n')
+
+
+def main(prompt):
+    
+    tasks = []
+    for i in range(10):
+        tasks.append(tweet(prompt, i))
+
+    # run the tasks in parallel
+    run_async(tasks)
+
+prompt = "Write a tweet about best practices for prompt engineering"
+
+template = f'''
+As an AI language model, your task is to create a high-quality tweet. Follow these guidelines:
+
+1. Length: Keep the tweet within 280 characters, including spaces and punctuation.
+2. Purpose: Clearly define the tweet's purpose (e.g., informing, entertaining, inspiring, or promoting).
+3. Audience: Consider the target audience and tailor the language and content accordingly.
+4. Tone: Maintain a consistent tone and don't sound salesy or disingenuous. Be based and direct.
+5. Content: Ensure the tweet is:
+    - Relevant and timely
+    - Accurate and factual (if sharing information)
+    - Original and engaging
+    - Clear and concise
+
+6. Structure:
+    - Start with a hook or attention-grabbing element
+    - Present the main idea or message clearly
+    - End with a thought-provoking insight (if appropriate)
+
+7. Hashtags: Include 1-2 relevant hashtags, if applicable, to increase discoverability.
+8. Proofread: Ensure there are no spelling or grammatical errors.
+
+After generating the tweet, review it to ensure it meets these criteria and make any necessary adjustments to optimize its quality and potential engagement.
+
+Here is your instruction:
+
+{prompt}
+'''
+
+main(template)
+
+```
+
+
+
+However, this is somewhat difficult to maintain in a file which should ideally only have your code! Realign uses YAML configuration files to keep track of all settings that are stateless (things that don't depend on the application runtime state).
+
+
+
+This can include things like model, system_prompt, template, temperature, etc. 
+
+
+
+Let's use a config file for this example. Create a `config.yaml` file in your directory, and paste the following:
+
+
+
+```yaml
+
+llm_agents:
+  tweetbot:
+    model: openai/gpt-4o-mini
+    template: |
+      As an AI language model, your task is to create a high-quality tweet. Follow these guidelines:
+
+      1. Length: Keep the tweet within 280 characters, including spaces and punctuation.
+      2. Purpose: Clearly define the tweet's purpose (e.g., informing, entertaining, inspiring, or promoting).
+      3. Audience: Consider the target audience and tailor the language and content accordingly.
+      4. Tone: Maintain a consistent tone and don't sound salesy or disingenuous. Be based and direct.
+      5. Content: Ensure the tweet is:
+          - Relevant and timely
+          - Accurate and factual (if sharing information)
+          - Original and engaging
+          - Clear and concise
+
+      6. Structure:
+          - Start with a hook or attention-grabbing element
+          - Present the main idea or message clearly
+          - End with a thought-provoking insight (if appropriate)
+
+      7. Hashtags: Include 1-2 relevant hashtags, if applicable, to increase discoverability.
+      8. Proofread: Ensure there are no spelling or grammatical errors.
+
+      After generating the tweet, review it to ensure it meets these criteria and make any necessary adjustments to optimize its quality and potential engagement.
+
+      Here is your instruction:
+
+      {{prompt}}
+
+```
+
+Some notes on the YAML file:
+
+- The key 'tweetbot' is the agent name. This is referenced in the code using the `agent_name` param.
+
+- The `model` field specifies the model in `<provider>/<model>` format.
+
+- The `template` field is a Jinja template (string with double curly braces for variables, like `{{var}}`). The template is rendered using a Python dictionary which maps the variable key string with the rendered string for that variable name. This is passed into `allm_messages_call` using the `template_param` field.
+
+You can find the full specification for the YAML config [here](#TODO).
+
+
+
+We can import the config by setting the global path in our code:
+
+```python
+import realign
+realign.config_path = 'tutorials/tweetbot/config.yaml'
+```
+
+We can use this agent in our code by modifying the `allm_messages_call` params:
+
+```python
+async def tweet(prompt, i):
+    
+    new_message = await allm_messages_call(
+        agent_name='tweetbot',
+        template_params={'prompt': prompt}
+    )
+
+    print(f'\nTweet {i+1}:\n\n', new_message.content, '\n\n')
+```
+
+Finally, we just call `main` with our prompt:
+
+```python
+main("Write a tweet about best practices for prompt engineering")
+```
+
+
+
+Running this will use the config file settings to run your agent. To make changes to the agent's config, you can make changes to the agent config directly. This allows you to quickly play with various settings including:
+
+- model (string)
+
+- hyperparams (model-specific dict)
+
+- system_prompt (string)
+
+- template (string)
+
+- template_params (key-value map)
+
+- json_mode (bool)
+
+- role ('assistant' / 'user')
+  
+  
+
+For example, we can set the temperature to 1 by adding the following line:
+
+```yaml
+llm_agents:
+  tweetbot:
+    model: openai/gpt-4o-mini
+    hyperparams:
+      temperature: 1.0
+    template: |
+      As an AI language model, ...
+```
+
+
+
+### Set up Evaluators
+
+Now that you have a Tweet agent that can generate tweets quickly, you might want to evaluate the responses to get make sure the quality is high. To do this, we can set up evaluators.
+
+
+
+But what is an evaluator?
+
+> An **Evaluator** is a function which *scores* your app's output and *checks* if the score is within a *target* range.
+
+
+
+There are a few ways to implement Evaluators:
+
+- Python Evaluator: simple (or complex) python functions.
+
+- Local Model Evaluator: these use a model on your local device
+
+- LLM Evaluator: these use an LLM to generate a score for your application
+
+
+
+Let's build 4 evaluators:
+
+1. Tweet should be under 280 characters (simple Python function)
+
+2. Tweet should not be hateful (Hugginface model)
+
+3. Tweet should be of positive sentiment (Hugginface model)
+
+4. The content of the Tweet should be high quality (LLM call)
+
+
+
+#### Eval 1: Tweet should be under 280 characters
+
+To evaluate this metric, we simply measure the Python len() and assert that we are within the character limit. Pretty simple.
+
+```python
+def tweet_length_checker(tweet_text):
+    # Evaluation = assert that score(output) within target range
+
+    num_chars = len(tweet_text) # score(output)
+
+    # assert that score is within target range
+    assert 0 < num_chars <= 280
+    
+    # Evaluation Result
+    return eval_result
+```
+
+#### Eval 2: Tweet should not be hateful
+
+For this metric, we can use one of Huggingface's Text Classification models. Here's a function you can use: 
+
+First install
+
+```bash
+pip install transformers datasets evaluate accelerate torch
+```
+
+Then paste
+
+```python
+from transformers import pipeline
+import torch
+
+def hate_speech_detection(tweet_text):
+    # Evaluation = assert that score(output) within target range
+    # score = hate / nothate
+    # target = nothate
+    
+    # Check if MPS is available (Mac Apple Silicon)
+    if torch.backends.mps.is_available():
+        device = torch.device("mps")
+        print("Using MPS (Metal) device for GPU acceleration")
+    else:
+        device = torch.device("cpu")
+        print("MPS not available, using CPU")
+
+    # Create the pipeline with the specified device
+    pipe = pipeline(task='text-classification', 
+                    model='facebook/roberta-hate-speech-dynabench-r4-target',
+                    device=device)
+    
+    # get the response
+    response = pipe(tweet_text)
+    
+    assert response[0]['label'] == 'nothate'
+    
+    return response[0]['label']
+```
+
+This will return something like
+
+```json
+[{'label': 'nothate', 'score': 0.9998}]
+```
+
+
+
+#### Eval 3: Tweet should have positive sentiment
+
+Similar to the last example, we can use Huggingface pipelines:
+
+```python
+from transformers import pipeline
+import torch
+
+def hate_speech_detection(tweet_text):
+    # Evaluation = assert that score(output) within target range
+    # score = positive / neutral / negative
+    # target = [positive, neutral]
+    
+    # Check if MPS is available (Mac Apple Silicon)
+    if torch.backends.mps.is_available():
+        device = torch.device("mps")
+        print("Using MPS (Metal) device for GPU acceleration")
+    else:
+        device = torch.device("cpu")
+        print("MPS not available, using CPU")
+
+    # Create the pipeline with the specified device
+    pipe = pipeline(task='text-classification', 
+                    model='cardiffnlp/twitter-roberta-base-sentiment-latest',
+                    device=device)
+    
+    # get the response
+    response = pipe(tweet_text)
+    
+    
+    assert response[0]['label'] in ['positive', 'neutral']
+    
+    return response[0]
+```
+
+
+
+Feeling icky with all the code duplication? In Realign, we can pull out all the static / stateless settings into the config file. This helps you cleanly manage your evaluators. Moreover, Realign provides in-built configurations and evaluators.
+
+
+
+### Using Realign Evaluators
+
+In Realign, any Python function can be converted to an Evaluator using the `@evaluator` decorator. If your function is async, you can use the `@aevaluator` decorator. 
+
+
+
+In our case, Realign @evaluator can help you create a wrapper around a base implementation of Huggingface pipeline, abstracting out any hyperparams you like. 
+
+We'll do this in 3 steps:
+
+1. Create the base evaluator with the right keyword args (in this case, task and model)
+
+2. Create a config file and add the Huggingface evaluator settings
+
+3. Use these evaluators in your code
+
+
+
+Let's begin:
+
+1. **Create the base evaluator with the right keyword args (in this case, task and model)**
+
+```python
+from transformers import pipeline
+import torch
+
+from realign.evaluators import evaluator
+
+@evaluator
+def hf_pipeline(tweet_text, task=None, model=None):
+    assert task and model # task and model should be specified
+
+    # Check if MPS is available (Mac Apple Silicon)
+    if torch.backends.mps.is_available():
+        device = torch.device("mps")
+        print("Using MPS (Metal) device for GPU acceleration")
+    else:
+        device = torch.device("cpu")
+        print("MPS not available, using CPU")
+
+    # Create the pipeline with the specified device
+    pipe = pipeline(task=task, 
+                    model=model,
+                    device=device)
+
+    # get the response
+    print(f'\n\nRunning hf_pipeline with task {task} and model {model}\n\n')
+    response = pipe(tweet_text)
+
+    return response[0]
+
+
+
+```
+
+2. **Create a config file and add the Huggingface evaluator settings**
+
+For the config, let's create a file in the same directory called `config.yaml`, and paste the following:
+
+```yaml
+evaluators:
+    hf_hate_speech:
+        wraps: hf_pipeline
+        model: facebook/roberta-hate-speech-dynabench-r4-target
+        task: text-classification
+
+        checker: value['label'] in target
+        target: [nothate]
+        asserts: on
  
- We'll be walking through an example. To skip the tutorial and run the file, `pip install realign`, paste [this file](https://github.com/honeyhiveai/realign/blob/main/examples/example_chat_simulation.py) into your editor, and run.
-
-Let’s say you want to build a AI tutoring assistant that helps a student learn a new concept. At first, it might be difficult to tune the prompt and evaluate results. Simulation can be a powerful tool to help you develop and improve your application quickly.
-
-A simulation has 3 main steps:
-
-1. Initialize the Simulation
-2. Run the Simulation
-3. Save run & eval results to a dataset
-
-![simulation.png](site/simulation.png)
-
-We first initialize the `ChatSimulation` so and ask it to run 3 conversations of 10 messages each. 
-
-```python
-from realign.agents import ChatAgent, SyntheticUserFactory
-from realign.simulation import ChatSimulation
-from realign.evaluators.llm_evaluators import allm_toxicity_rating, allm_user_engagement
-
-# initialize simulation
-simulation = ChatSimulation(runs=10, max_messages=20)
+    hf_sentiment_classifier:
+        wraps: hf_pipeline
+        task: text-classification
+        model: cardiffnlp/twitter-roberta-base-sentiment-latest
+        
+        checker: value['label'] in target
+        target: [positive, neutral]
+        asserts: on
+        
 ```
 
-Next, we set the `simulation.app` param. This is your main `ChatAgent` that you want to test. 
+3. **Use these evaluators in your code**
+
+We can update our tweet function as follows:
 
 ```python
-# initialize your app agent
-simulation.app = ChatAgent(system_prompt='''
-    As an AI tutor, your role is to guide student learning across various subjects through explanations and questions. \
-    Assess student knowledge and adapt your approach accordingly, providing clear explanations with simple terms and examples.
-''')
+async def tweet(prompt, i):
+    
+    new_message = await allm_messages_call(
+        agent_name='tweetbot',
+        template_params={'prompt': prompt}
+    )
+    
+    # evaluate for hate speech
+    evaluators['hf_hate_speech'](new_message.content)
+    
+    # evaluate for positive sentiment 
+    evaluators['hf_sentiment_classifier'](new_message.content)
+    
 ```
 
-We then set the simulator which will run your app. In the ChatSimulation case, the simulator is a synthetic user generator. We use the `SyntheticUserFactory` utility to specify a persona and scenario. Realign leverages 1000 diverse personas to seed each simulated conversation and create diverse scenarios.
 
-```python
-# initialize your synthetic user agent builder
-simulation.simulator = SyntheticUserFactory().as_a('student').they_want_to('learn something new')
-														
-# Generates personas whose first chat message is as follows:
-# Hi, I'm Saman, a graduate student at Duke Kunshan University, and I'd love to dive into the world of quantum mechanics starting with an overview of the field.
-# Hi, I'm Addy, a graduate student studying international relations, and I'm eager to explore the phenomenon of emerging powers; could you provide a brief overview of what emerging powers are in the context of international relations?
-# Hi, I'm AJ, a university psychology student, and I'd love to explore the relationship between creativity and personality traits - could you break it down for me?
 
-# to use a different model for the synthetic user agent
-# simulation.simulator.with_synth_user_model('openai/gpt-4o-mini')
-```
+Using the YAML file helps you tweak different hyperparameters and settings easily wihthout changing your code. For 
 
-We want the simulation be fast, and so the default synthetic user uses `openai/gpt-4o-mini`.
 
-Finally, we specify a list of evaluators which will be run after each simulation run is complete. To create your own custom evaluators, refer to the docs below.
 
-```python
-# add evaluators
-simulation.evaluators = [allm_toxicity_rating, allm_user_engagement]
-```
+The benefit of this is even greater when we use evaluators for LLM evaluators.
 
-To actually run the simulation, simply call `simulation.run()`. Push the run data and evaluation data to json files using the following functions:
 
-```python
-# run simulation
-simulation.run()
 
-# publish simulation run and eval results
-simulation.push_runs_to_dataset('src/realign/data/run_data.json')
-simulation.push_evals_dataset('src/realign/data/eval_data.json')
-```
+#### @evaluator settings
 
-Here’s the plug-and-play file:
+Any function decorated with @evaluator will fetch the configs for that evaluator
 
-```python
-from realign.agents import ChatAgent, SyntheticUserFactory
-from realign.simulation import ChatSimulation
-from realign.evaluators.llm_evaluators import allm_toxicity_rating, allm_user_engagement
+- `wraps`: wrap a base evaluator with the settings specified in this config to create a new evaluator
 
-# initialize simulation
-simulation = ChatSimulation(runs=10, max_messages=20)
+- `transform`: apply a Python code transformation after your evaluator is executed. Useful for mapping / filtering your output. You can reference other evaluators here too.
 
-# initialize your app agent
-simulation.app = ChatAgent(system_prompt='''
-    As an AI tutor, your role is to guide student learning across various subjects through explanations and questions. \
-    Assess student knowledge and adapt your approach accordingly, providing clear explanations with simple terms and examples.
-''', model='openai/gpt-4o-mini')
+- `repeat`: number of times to repeat the evaluator (useful for stochastic evaluators such as LLM judges)
 
-# initialize your synthetic user agent builder
-simulation.simulator = SyntheticUserFactory().as_a('student').they_want_to('learn something new')
+- `aggregate`: apply a Python code aggregation on your evaluator's output, after the repeats and transformation (if specified). This can help you reduce a list of outputs to a single one, maybe by taking the mean score.
 
-# to use a different model for the synthetic user agent
-# simulation.simulator.with_synth_user_model('openai/gpt-4o-mini')
+- `checker`: apply a Python code check whether the output is in the target range
 
-# add evaluators
-simulation.evaluators = [allm_toxicity_rating, allm_user_engagement]
+- `asserts`: apply the Python `assert` keyword to final output
 
-# run simulation
-simulation.run()
+- `**kwargs`: any additional key-value pairs are passed in as keyword arguments to the evaluator function. This is useful for domain or task specific evaluators.
 
-# publish simulation run and eval results
-simulation.push_runs_to_dataset('src/realign/data/run_data.json')
-simulation.push_evals_dataset('src/realign/data/eval_data.json')
-```
 
-# Core Concepts
+
+# Concepts
+
+## Configs
+
+coming soon!
+
+## Agents
+
+coming soon!
 
 ## Evaluators
 
-### **What is an `evaluator`?**
+coming soon!
 
-An evaluator is a function which measures the quality of an LLM application output by giving it a `score` and evaluating a bool `result` which indicates whether if the score is in the target range.
 
-It follows the signature:
-
-```python
-from realign.evaluation import evaluator
-
-@evaluator
-def evaluator(output):
-	
-	# calculate score of the output
-	score = ...
-	
-	# evaluate whether the score is in the target range
-	result = score > target
-	
-	return score, result
-```
-
-The `output` is a key-value pair of various output params. For example, a multi step application could have the output:
-
-```python
-output = {
-  'messages': [ 
-    {'role': 'user', 'content': 'What is the capital of France?'}, 
-    {'role': 'assistant', 'content': 'The capital of France is Paris'}
-  ]
-}
-```
-
-### What is the @evaluator decorator?
-
-The `@evaluator` decorator simply helps you wrap your evaluator output as an object which has some in built helpers. Importantly, it allows you do use your evaluation as a guardrail in your code as follows:
-
-```python
-from realign.evaluators.llm_evaluators import allm_toxicity_rating, allm_topic_classification
-
-import asyncio
-
-async def main():
-    messages = []
-
-    # ... run your application
-
-    evaluation = await allm_toxicity_rating(messages)
-
-    if evaluation.result == False:
-        raise Exception('Output failed quality guardrail.')
-
-    print('Score:', evaluation.score)
-
-    classes = ['solve a problem', 'explain a concept']
-
-    # the unpack() function will return the score and result
-    score, result = await allm_topic_classification(messages, categories).unpack()
-
-    assert result
-    print('Class:', score) # will print the category
-    
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-### Which evaluators should I use?
-
-Realign offers a library of well-tuned evaluators which you can directly import into your application or test suite. You can also create a custom evaluator by implementing a function with the same format. Evaluators generally come in 3 different flavors:
-
-- Python evaluators (code, API calls, 3rd party libraries, etc)
-- LLM as a judge evaluators (using an intelligent model to evaluate)
-- NLP evaluators (such as BERT-based evaluators)
-
-## AgentSettings
-
-AgentSettings are used to specify all the ***stateless*** settings of an LLM calls. By stateless, we mean all the settings which don’t depend on the application / agent state. For example, AgentSettings does not include `messages` since it is *stateful.*
-
-AgentSettings applies to *all* LLM calls in Realign, including app agent LLM calls, synthetic user LLM calls, and evaluator LLM calls. 
-
-Here’s the spec for AgentSettings:
-
-```python
-@dataclass
-class AgentSettings:
-		# litellm model name. Refer to https://docs.litellm.ai/docs/providers.
-    model: str 
-    
-    # API key env variable name. 
-    # If not provided, defaults to <MODEL_PROVIDER>_API_KEY format
-    api_key: Optional[str] = None
-    
-    # hyperparam dictionary in OpenAI format, eg. { 'temperature': 0.8 }
-    hyperparams: Optional[dict[str, Any]] = None
-		
-		# literal system prompt
-		# if provided, template and template_params will be ignored
-    system_prompt: Optional[str] = None
-
-		# Jinja template and prompt_param dictionary to render it
-	  # string key for the template. Actual templates defined in realign.prompts
-    template_params: Optional[dict[str, str]] = None
-    template: Optional[str] = None
-
-		# json_mode for the response format
-    json_mode: Optional[bool] = False
-    
-    # user or assistant
-    role: str = 'assistant'
-```
-
-## Datasets
-
-In Realign, there are 2 types of datasets:
-
-- The Run Dataset stores the final state of your simulation run (messages for chat simulations)
-- The Eval Dataset stores the evaluation results and scores of your simulation runs
-
-The `simulation.push_runs_to_dataset()` and `simulation.push_evals_dataset()` functions are used to save the run and eval data to a json file respectively.
-
-Dataset tooling is coming soon!
 
 ## Simulation
 
-### What is a Simulation?
+coming soon!
 
-- A simulation is a coroutine that runs N times.
-- Within the coroutine, your App agent will interact with the Simulator environment for several turns.
-- After the last turn, the Evaluator functions will be run on the final state of the simulation to compute various metrics.
 
-### Why should I simulate?
 
-- For multi-turn applications, traditional playgrounds don’t scale well since it becomes harder to mock user turns.
-- Since the LLM behavior is stochastic, it becomes difficult to reach and evaluate the wide variety of possible states of your application. For example, you want to know the average topic of conversation between turns 10-15 of your chatbot’s conversation.
-- Simulations in Realign run on multiple threads simultaneously, saving you time and energy.
+# Guides
 
-### How do Simulations work?
+- [TODO] how do I evaluate my agent?
 
-Each simulation manages, transforms, and evaluates the state of your application. For example, in the ChatSimulation case, the state is a list of openai messages: `messages = [OpenAIMessage(...role, ...content), ...]`
+- [TODO]how to I customize my evaluator?
 
-- The App and SyntheticUser update the state each turn by adding a new message given previous messages
-- The chat Evaluator functions take `messages` as their input parameter and return the score and result for that state.
+- [TODO]how do I improve my agent?
 
-The `state` is an abstract concept that ties together your application, the simulator, and the evaluators. It is not typed in the Realign SDK and left open ended for ease of development. However, designing around the shape of your agent `state` can help you create systematic simulation and evaluation flows.
+- [TODO]how do I improve my RAG pipeline?
+  
+  
 
-![chart.png](site/chart.png)
+# API Reference
 
-### What is the Simulator?
+coming soon!
 
-Your agent likely has external dependencies, such as a human user or a third party API call. All such dependencies must be simulated for your agent to function. The `simulation.simulator` param specifies this simulator.
-
-You might wonder why we pass in a SyntheticUserFactory instead of a SyntheticUser. This is because the simulator will `yield` a new SyntheticUser each time a coroutine is spawned, and so what we need to pass in is the *synthetic user generator* rather than the actual synthetic user. Here’s how it works:
-
-- Synthetic user builder yields a new persona for every simulation run
-- The SyntheticUserFactory is initialized using persona and scenario. Each run will have variants of different personas based on what you specify.
-- Realign’s SyntheticUserFactory leverages 1000 personas specified in the `persona-hub/personas.jsonl` file. For more information, please refer to the [Persona Hub paper.](https://arxiv.org/pdf/2406.20094)
 
 
 # Contributing
 
 We welcome contributions from the community to help make Realign better. This guide will help you get started. If you have any questions, please reach out to us on [Discord](https://discord.gg/vqctGpqA97) or through a [GitHub issue](https://github.com/honeyhiveai/realign/issues/new).
 
-## Project Overview
+### Project Overview
 
 Realign is an MIT licensed testing framework for multi-turn AI applications. It simulates user interactions, evaluates AI performance, and generates adverserial test cases.
 
 We particularly welcome contributions in the following areas:
 
 - Bug fixes
+
 - Documentation updates, including examples and guides
 
-## Getting Started
+### Getting Started
 
 1. Fork the repository on GitHub.
+
 2. Clone your fork locally:
 
-   ```sh
-   git clone https://github.com/[your-username]/realign.git
-   cd realign
-   ```
+```sh
+git clone https://github.com/[your-username]/realign.git
+
+cd realign
+```
 
 3. Set up your development environment:
 
-   ```sh
-   pip install -r requirements.txt
-   ```
+```sh
+pip install -r requirements.txt
+```
 
-
-## Development Workflow
+### Development Workflow
 
 1. Create a new branch for your feature or bug fix:
 
-   ```sh
-   git checkout -b feature/your-feature-name
-   ```
+```sh
+git checkout -b feature/your-feature-name
+```
 
 2. We try to follow the [Conventional Commits](https://www.conventionalcommits.org/) specification. This is not required for feature branches. We merge all PRs into `main` with a squash merge and a conventional commit message.
 
 3. Push your branch to your fork:
 
-   ```sh
-   git push origin your-branch-name
-   ```
+```sh
+git push origin your-branch-name
+```
 
 4. Open a pull request against the `main` branch of the promptfoo repository.
 
 When opening a pull request:
 
 - Keep changes small and focused. Avoid mixing refactors with new features.
+
 - Ensure test coverage for new code or bug fixes.
+
 - Provide clear instructions on how to reproduce the problem or test the new feature.
+
 - Be responsive to feedback and be prepared to make changes if requested.
+
 - Ensure your tests are passing and your code is properly linted.
 
 Don't hesitate to ask for help. We're here to support you. If you're worried about whether your PR will be accepted, please talk to us first (see [Getting Help](#getting-help)).
 
-
-## Getting Help
+### Getting Help
 
 If you need help or have questions, you can:
 
 - Open an issue on GitHub.
+
 - Join our [Discord community](https://discord.gg/vqctGpqA97).
 
-## Code of Conduct
+### Code of Conduct
 
 We follow the [Contributor Covenant Code of Conduct](https://www.contributor-covenant.org/). Please read and adhere to it in all interactions within our community.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
