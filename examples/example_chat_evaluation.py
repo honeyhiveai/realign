@@ -1,6 +1,6 @@
-from realign.evaluation import ChatEvaluation
+from lab.evaluators.evaluation import ChatEvaluation
 from realign.datasets import ChatDataset
-from realign.evaluators.llm_evaluators import allm_toxicity_rating
+from lab.evaluators.llm_evaluators import allm_toxicity_rating
 
 evaluation = ChatEvaluation()
 evaluation.dataset = ChatDataset('data/run_data.json')

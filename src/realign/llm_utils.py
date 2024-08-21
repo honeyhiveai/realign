@@ -1,70 +1,242 @@
-from realign.types import ModelSettings, OpenAIMessage, RunData, EvalResult
-from realign.router import Router
-from typing import Any
-from litellm import aembedding
-
 import os
 import json
 import asyncio
-from functools import wraps
+from dataclasses import dataclass
+from typing import Any, Optional, Callable, Union, Coroutine
+import hashlib
+import yaml
 
 
-# initialize the request router
+from jinja2 import Template
+
+from litellm import ModelResponse, aembedding, acompletion, validate_environment
+import litellm
+
+from realign.router import Router
+from realign.config import load_yaml_settings
+from realign.utils import bcolors, run_async
+
+
+# this flag helps litellm modify params to ensure that model-specific requirements are met
+litellm.modify_params = True
+
+# initialize the global request router
 router = Router()
-
-class bcolors:
-    HEADER = "\033[95m"
-    OKBLUE = "\033[94m"
-    OKCYAN = "\033[96m"
-    OKGREEN = "\033[92m"
-    WARNING = "\033[93m"
-    FAIL = "\033[91m"
-    ENDC = "\033[0m"
-    BOLD = "\033[1m"
-    UNDERLINE = "\033[4m"
+        
+# Register the cleanup function
+# atexit.register(lambda: router or router.__del__())
 
 
-def print_system_prompt(model_settings: ModelSettings):
-    if model_settings.role == "user":
-        print(
-            bcolors.HEADER + "\nUSER SYSTEM PROMPT\n\n",
-            model_settings.system_prompt,
-            bcolors.ENDC,
+@dataclass
+class OpenAIMessage:
+    role: str
+    content: str | dict[str, str]
+
+    def __dict__(self):
+        return {"role": str(self.role), "content": str(self.content)}
+
+
+@dataclass
+class RunData:
+    final_state: Any
+    run_id: Optional[int] = None
+
+    def __dict__(self):
+        return {"run_id": self.run_id, "final_state": self.final_state}
+
+    def __repr__(self) -> str:
+        return str(self.__dict__())
+
+    def compute_hash(self, hash_algorithm="sha256"):
+        """
+        Compute a hash of a RunData.
+
+        :param obj: The object to hash
+        :param hash_algorithm: The hash algorithm to use (default is 'sha256')
+        :return: A hexadecimal string representation of the hash
+        """
+        # Convert the object to a JSON string
+        json_string = json.dumps(self.__dict__(), sort_keys=True, default=str)
+
+        # Create a hash object with the specified algorithm
+        hash_object = hashlib.new(hash_algorithm)
+
+        # Update the hash object with the JSON string (encoded to bytes)
+        hash_object.update(json_string.encode("utf-8"))
+
+        # Return the hexadecimal representation of the hash
+        return hash_object.hexdigest()
+
+
+@dataclass
+class State:
+    messages: list[OpenAIMessage]
+
+    def __init__(self):
+        self.messages = []
+
+    def __repr__(self) -> str:
+        return str_msgs(self.messages[1:])
+
+
+@dataclass
+class AgentSettings:
+    # litellm model name. Refer to https://docs.litellm.ai/docs/providers.
+    model: str
+
+    # API key env variable name.
+    # If not provided, defaults to <MODEL_PROVIDER>_API_KEY format
+    api_key: Optional[str] = None
+
+    # hyperparam dictionary in OpenAI format, eg. { 'temperature': 0.8 }
+    hyperparams: Optional[dict[str, Any]] = None
+
+    # literal system prompt
+    # if provided, template and template_params will be ignored
+    system_prompt: Optional[str] = None
+
+    # Jinja template and prompt_param dictionary to render it
+    # string key for the template. Actual templates defined in realign.prompts
+    template_params: Optional[dict[str, str]] = None
+    template: Optional[str] = None
+
+    # json_mode for the response format
+    json_mode: Optional[bool] = False
+
+    # user or assistant
+    role: str = "assistant"
+
+    def resolve_response_format(self) -> str:
+        if self.json_mode:
+            return {"type": "json_object"}
+        return None
+
+    def resolve_system_prompt(self) -> str:
+        prompt_to_render = ""
+        system_prompt = self.system_prompt
+        template = self.template
+        if system_prompt is None:
+            if template is None:
+                raise ValueError(
+                    "Either system_prompt or template must be provided in the model settings"
+                )
+            else:
+                prompt_to_render = self.resolve_prompt_template(template)
+        else:
+            prompt_to_render = system_prompt
+
+        jinja_template = Template(prompt_to_render)
+        template_params = self.template_params
+
+        if template_params is None:
+            return jinja_template.render({})
+        elif type(template_params) != dict:
+            raise ValueError("Prompt params must be a dictionary")
+        elif not all([type(k) == str for k in template_params.keys()]):
+            raise ValueError("Prompt params keys must be strings")
+
+        # ensure that values are all strings
+        for k, v in template_params.items():
+            if type(k) != str:
+                raise ValueError("Prompt params keys must be strings")
+            if type(v) != str:
+                template_params[k] = str(v)
+
+        # try to render the template
+        try:
+            render = jinja_template.render(template_params)
+        except Exception as e:
+            raise ValueError(f"Error rendering system prompt: {e}")
+
+        return render
+
+    def resolve_prompt_template(self, template_name_or_template: str):
+        try:
+            with open("src/realign/templates.yaml", "r") as f:
+                prompts = yaml.load(f, Loader=yaml.FullLoader)
+                if template_name_or_template not in prompts:
+                    return template_name_or_template
+                return prompts[template_name_or_template]
+        except:
+            # return the template if exception
+            return template_name_or_template
+
+    def validate_keys(self):
+        # validate that the API keys are set
+        model_key_validation = validate_environment(self.model)
+        if not model_key_validation["keys_in_environment"]:
+            raise ValueError(
+                "Could not find the following API keys in the environment: {}".format(
+                    ",".join(model_key_validation["missing_keys"])
+                )
+            )
+
+    def copy(self) -> "AgentSettings":
+        return AgentSettings(
+            model=self.model,
+            api_key=self.api_key,
+            hyperparams=self.hyperparams,
+            template_params=self.template_params,
+            template=self.template,
+            system_prompt=self.system_prompt,
+            json_mode=self.json_mode,
+            role=self.role,
         )
-    elif model_settings.role == "assistant":
-        print(
-            bcolors.HEADER + "\nASSISTANT SYSTEM PROMPT\n\n",
-            model_settings.system_prompt,
-            bcolors.ENDC,
+
+    def with_template_params(self, template_params: dict[str, str]) -> "AgentSettings":
+        self.template_params = template_params
+        return self
+
+
+def system_prompt_str(agent_settings: AgentSettings):
+    """Returns the system prompt for the given agent settings"""
+
+    string = ""
+    if agent_settings.role == "user":
+        string = " ".join(
+            (
+                bcolors.HEADER + "\nUSER SYSTEM PROMPT\n\n",
+                agent_settings.system_prompt,
+                bcolors.ENDC,
+            )
         )
+    elif agent_settings.role == "assistant":
+        string = " ".join(
+            (
+                bcolors.HEADER + "\nASSISTANT SYSTEM PROMPT\n\n",
+                agent_settings.system_prompt,
+                bcolors.ENDC,
+            )
+        )
+    return string
 
 
-def print_chat(messages: list[OpenAIMessage]):
+def str_msgs(messages: list[OpenAIMessage]):
+    string = ""
     for m in messages:
         if m.role == "user":
-            print(
-                bcolors.OKBLUE + "\n", m.role.upper(), "\n\n", m.content, bcolors.ENDC
+            string += "\n" + " ".join(
+                (bcolors.OKBLUE + "\n", m.role.upper(), "\n\n", m.content, bcolors.ENDC)
             )
         elif m.role == "assistant":
-            print(
-                bcolors.OKGREEN + "\n", m.role.upper(), "\n\n", m.content, bcolors.ENDC
+            string += "\n" + " ".join(
+                (
+                    bcolors.OKGREEN + "\n",
+                    m.role.upper(),
+                    "\n\n",
+                    m.content,
+                    bcolors.ENDC,
+                )
             )
         elif m.role == "system":
             pass
+    return string
 
 
 def print_run_id(run_id):
     print("-" * 100)
     print("RUN ID:", run_id)
     print("-" * 100)
-
-
-def print_evals(evals: list[EvalResult]):
-    print(bcolors.WARNING)
-    for e in evals:
-        print(e)
-        print("- " * 50)
-    print(bcolors.ENDC)
 
 
 def swap_roles(messages: list[OpenAIMessage]) -> list[OpenAIMessage]:
@@ -76,17 +248,81 @@ def swap_roles(messages: list[OpenAIMessage]) -> list[OpenAIMessage]:
     return messages
 
 
+def llm_call_resolve_agent_settings(
+    agent_settings_or_name: Optional[Union[AgentSettings, dict, str]] = None,
+    agent_settings: Optional[Union[AgentSettings, dict]] = None,
+    agent_name: Optional[str] = None,
+    **agent_settings_kwargs,
+) -> AgentSettings:
+
+    # assert all types
+    assert isinstance(
+        agent_settings_or_name, (AgentSettings, dict, str, type(None))
+    ), f"agent_settings_or_name type {type(agent_settings_or_name)} is invalid"
+    assert isinstance(
+        agent_settings, (AgentSettings, dict, type(None))
+    ), f"agent_settings type {type(agent_settings)} is invalid"
+    assert isinstance(
+        agent_name, (str, type(None))
+    ), f"agent_name type {type(agent_name)} is invalid"
+
+    agent_settings_to_use = None
+
+    # First, check agent_settings_or_name
+    if agent_settings_or_name is not None:
+        if isinstance(agent_settings_or_name, AgentSettings):
+            agent_settings_to_use = agent_settings_or_name
+        elif isinstance(agent_settings_or_name, dict):
+            agent_settings_to_use = AgentSettings(**agent_settings_or_name)
+        elif isinstance(agent_settings_or_name, str):
+            agent_settings_to_use = get_agent_settings(
+                agent_name=agent_settings_or_name
+            )
+
+    # Then, check agent_settings
+    if agent_settings_to_use is None and agent_settings is not None:
+        if isinstance(agent_settings, AgentSettings):
+            agent_settings_to_use = agent_settings
+        elif isinstance(agent_settings, dict):
+            agent_settings_to_use = AgentSettings(**agent_settings)
+
+    # Then, check agent_name
+    if agent_settings_to_use is None and agent_name is not None:
+        agent_settings_to_use = get_agent_settings(agent_name=agent_name)
+
+    # If still None, use default settings
+    if agent_settings_to_use is None:
+        agent_settings_to_use = AgentSettings(
+            model="openai/gpt-4o-mini",
+            role="assistant",
+        )
+
+    # Apply any additional kwargs
+    for key, value in agent_settings_kwargs.items():
+        setattr(agent_settings_to_use, key, value)
+
+    assert isinstance(
+        agent_settings_to_use, AgentSettings
+    ), f"agent_settings_to_use type {type(agent_settings_to_use)} is invalid"
+    return agent_settings_to_use
+
+
 def llm_call_get_completion_params(
-    model_settings: ModelSettings, messages: list[OpenAIMessage]
+    agent_settings: Optional[AgentSettings | dict[str, Any]] = None,
+    messages: Optional[list[OpenAIMessage]] = None,
 ) -> dict:
 
+    # ensure that messages is a list of OpenAIMessages
+    for i, m in enumerate(messages or []):
+        if not isinstance(m, OpenAIMessage):
+            messages[i] = OpenAIMessage(**m)
+
     # resolve the prompt
-    system_prompt = model_settings.resolve_system_prompt()
+    system_prompt = agent_settings.resolve_system_prompt()
 
     # validate the keys
-    model_settings.validate_keys()
+    agent_settings.validate_keys()
 
-    messages = messages or []
     if len(messages) == 0:
         messages = [OpenAIMessage(role="system", content=system_prompt)]
     elif messages[0].role != "system":
@@ -95,25 +331,25 @@ def llm_call_get_completion_params(
         messages[0].content = system_prompt
 
     # swap roles for user
-    if model_settings.role == "user":
+    if agent_settings.role == "user":
         messages = swap_roles(messages)
 
     # get the response format
-    response_format = model_settings.resolve_response_format()
+    response_format = agent_settings.resolve_response_format()
 
     # resolve hyperparams
-    hyperparams = model_settings.hyperparams or dict()
+    hyperparams = agent_settings.hyperparams or dict()
 
     # resolve api_key
     api_key = None
-    if model_settings.api_key:
-        os.getenv(model_settings.api_key)
+    if agent_settings.api_key:
+        os.getenv(agent_settings.api_key)
 
     # convert messages to dict
     messages_to_llm = [m.__dict__() for m in messages]
 
     return {
-        "model": model_settings.model,
+        "model": agent_settings.model,
         "api_key": api_key,
         "messages": messages_to_llm,
         "response_format": response_format,
@@ -122,60 +358,107 @@ def llm_call_get_completion_params(
 
 
 def llm_call_post_process_response(
-    model_settings: ModelSettings, messages: list[OpenAIMessage], response: Any
-) -> Any:
+    agent_settings: AgentSettings,
+    messages: list[OpenAIMessage],
+    response: Optional[ModelResponse | Exception],
+) -> OpenAIMessage:
 
     # unswap roles for user
-    if model_settings.role == "user":
+    if agent_settings.role == "user":
         messages = swap_roles(messages)
 
-    # process the message
+    # process empty or error responses
+    assert response is not None, "Received empty response."
+    if isinstance(response, Exception):
+        print(
+            f"API call for {agent_settings.model} failed: {response}. Returning string 'error' and continuing."
+        )
+        # some models require an alternate user / assistant dialog
+        if len(messages) == 0 or messages[-1].role != "user":
+            return OpenAIMessage(role="user", content="error")
+        else:
+            return OpenAIMessage(role="assistant", content="error")
+
     raw_message = response.choices[0].message
     response_message = OpenAIMessage(
         role=raw_message["role"], content=raw_message["content"]
     )
-    if model_settings.json_mode:
+    if agent_settings.json_mode:
         response_message.content = json.loads(response_message.content)
 
     return response_message
 
+def get_or_create_eventloop():
+    try:
+        return asyncio.get_event_loop()
+    except RuntimeError as ex:
+        if "There is no current event loop in thread" in str(ex):
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            return loop
+        raise
 
 def llm_messages_call(
-    model_settings: ModelSettings, messages: list[OpenAIMessage] = []
+    agent_settings_or_name: Optional[Union[AgentSettings, dict, str]] = None,
+    agent_settings: Optional[Union[AgentSettings, dict]] = None,
+    agent_name: Optional[str] = None,
+    messages: list[OpenAIMessage] | list[dict[str, str]] = [],
+    **agent_settings_kwargs,
 ) -> OpenAIMessage:
-    """Make an LLM call with the messages provided"""
+    
+    # resolve the agent settings
+    agent_settings = llm_call_resolve_agent_settings(
+        agent_settings_or_name=agent_settings_or_name,
+        agent_settings=agent_settings,
+        agent_name=agent_name,
+        **agent_settings_kwargs,
+    )
 
     # get the params
-    params = llm_call_get_completion_params(model_settings, messages)
+    params = llm_call_get_completion_params(agent_settings, messages)
 
-    # call the LLM
-    response = router.completion(**params)
+    # call the LLM using the router
+    response: ModelResponse = router.completion(**params)
 
     # post process the response
     message: OpenAIMessage = llm_call_post_process_response(
-        model_settings, messages, response
+        agent_settings, messages, response
     )
 
     return message
 
 
 async def allm_messages_call(
-    model_settings: ModelSettings, messages: list[OpenAIMessage] = None
+    agent_settings_or_name: Optional[Union[AgentSettings, dict, str]] = None,
+    agent_settings: Optional[Union[AgentSettings, dict]] = None,
+    agent_name: Optional[str] = None,
+    messages: list[OpenAIMessage] | list[dict[str, str]] = [],
+    **agent_settings_kwargs,
 ) -> OpenAIMessage:
-    """Make an LLM call with the messages provided"""
+    """Make an LLM call with provided agent_settings and messages"""
+
+    # resolve the agent settings
+    agent_settings = llm_call_resolve_agent_settings(
+        agent_settings_or_name=agent_settings_or_name,
+        agent_settings=agent_settings,
+        agent_name=agent_name,
+        **agent_settings_kwargs,
+    )
+    
 
     # get the params
-    params = llm_call_get_completion_params(model_settings, messages)
+    params = llm_call_get_completion_params(agent_settings, messages)
 
-    # call the LLM
-    response = await router.acompletion(**params)
+    # call the LLM using the router
+    response: ModelResponse = await router.acompletion(**params)
 
     # post process the response
     message: OpenAIMessage = llm_call_post_process_response(
-        model_settings, messages, response
+        agent_settings, messages, response
     )
 
     return message
+
 
 
 async def aembed_text(text: str, **kwargs):
@@ -190,85 +473,39 @@ def messages_to_string(messages: list[OpenAIMessage]) -> str:
     return "\n".join([m.role + ":\n" + m.content for m in messages])
 
 
-# evaluator decorator to wrap an app scorer inside a EvalResult object
-# TODO: composable evaluators
-def evaluator(eval_func=None, *, repeat=1, embed_explanation=True) -> EvalResult:
-    def decorator(func):
-        @wraps(eval_func)
-        async def wrapper(run_data: RunData, *args, **kwargs):
-            async def single_run():
-                if asyncio.iscoroutinefunction(func):
-                    # If the eval_func is already a coroutine function, just await it
-                    response = await func(run_data.final_state, *args, **kwargs)
-                else:
-                    # If it's a regular function, run it in a thread pool
-                    response = await asyncio.to_thread(
-                        func, run_data.final_state, *args, **kwargs
-                    )
+def get_agent_settings(
+    yaml_file: Optional[str] = None, agent_name: Optional[str] = None
+) -> dict[str, AgentSettings] | AgentSettings:
 
-                # verify that the eval_func response is a tuple of 3 elements (score: Any, result: bool | None, explanation: str | None)
-                if (
-                    not 2 <= len(response) <= 3
-                    or type(response) not in [list, tuple]
-                    or type(response[1]) not in [bool, type(None)]
-                    or (
-                        len(response) == 3
-                        and type(response[2]) not in [str, type(None)]
-                    )
-                ):
-                    raise ValueError(
-                        "Evaluator response must be a tuple of 2 elements, the score of type Any and result of type bool | None"
-                    )
+    parsed_yaml = load_yaml_settings(yaml_file)
 
-                # unpack results
-                score = None
-                result = None
-                explanation = None
-                if len(response) == 3 and response[2] is not None:
-                    score, result, explanation = response
-                    if embed_explanation:
-                        embedding = await aembed_text(explanation)
-                    return (score, result, explanation, embedding)
+    if not isinstance(parsed_yaml, dict) or "llm_agents" not in parsed_yaml:
+        raise ValueError(
+            "Invalid YAML structure. Expected 'llm_agents' key at the root level."
+        )
 
-                score, result = response
-                return (score, result, None, None)
+    assert isinstance(
+        parsed_yaml["llm_agents"], dict
+    ), "llm_agents must be a dictionary"
 
-            assert repeat >= 0, "Repeat must be greater than 0"
+    agent_settings = {}
+    for _agent_name, settings in parsed_yaml["llm_agents"].items():
+        agent_settings[_agent_name] = AgentSettings(**settings)
 
-            if repeat == 0:
-                return None
+    if agent_name is not None:
+        if agent_name not in agent_settings:
+            raise ValueError(f"Agent '{agent_name}' not found in 'llm_agents' section.")
+        return agent_settings[agent_name]
 
-            if repeat > 1:
-                tasks = [single_run() for _ in range(repeat)]
-                score_result_tuples = await asyncio.gather(*tasks)
-                scores, results, explanations, embeddings = zip(*score_result_tuples)
+    return agent_settings
 
-                # for repeats, return the full array of scores and results
-                return EvalResult(
-                    scores,
-                    results,
-                    explanations,
-                    embeddings,
-                    run_data,
-                    func.__name__,
-                    repeat,
-                )
-            else:
-                # for single runs, return a single score and result
-                score, result, explanation, embedding = await single_run()
-                return EvalResult(
-                    score,
-                    result,
-                    explanation,
-                    embedding,
-                    run_data,
-                    func.__name__,
-                    repeat,
-                )
 
-        return wrapper
+def get_realign_llm_utils_globals():
+    try:
+        from realign.llm_utils import allm_messages_call
+    except ImportError:
+        raise
 
-    if eval_func is None:
-        return decorator
-    else:
-        return decorator(eval_func)
+    return {
+        "allm_messages_call": allm_messages_call,
+    }

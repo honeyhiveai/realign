@@ -1,0 +1,45 @@
+
+llm_agents:
+  default: &basic_agent_settings
+    model: openai/gpt-4o-mini
+    system_prompt: |
+      Be a good agent.
+
+  rating_5_star_agent: &rating_5_star_agent
+    model: openai/gpt-4o-mini
+    template: rating_5_star
+    json_mode: on
+    hyperparams:
+      temperature: 0.5
+
+  explanation_summary_agent: &explanation_summary_agent
+    model: openai/gpt-4o-mini
+    template: explanation_summary
+    json_mode: on
+    hyperparams:
+      temperature: 0
+
+evaluators:
+
+  hf_hate_speech:
+    model: facebook/roberta-hate-speech-dynabench-r4-target
+    task: text-classification
+    repeat: 2
+    aggregate: hf_label_score_aggregator(values)
+    checker: value['best_label'] in target
+    target: [nothate]
+    asserts: on
+
+  hf_sentiment_classifier:
+    task: text-classification
+    model: cardiffnlp/twitter-roberta-base-sentiment-latest
+    repeat: 2
+    aggregate: hf_label_score_aggregator(values)
+    checker: value['best_label'] in target
+    target: [positive, neutral]
+    asserts: on
+
+  llm_rating_json:
+    repeat: 3
+    aggregate: llm_rating_json_aggregate(values)
+    agent_settings: *rating_5_star_agent

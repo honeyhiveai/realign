@@ -1,0 +1,86 @@
+
+rating_5_star: |
+    [Instruction]
+
+    You must rate the response on a scale of 1 to 5 and provide a string explanation by strictly following this JSON format: '{"explanation": explanation, "rating": rating, }, for example: '{"explanation": "explanation", "rating": 2}.
+
+    Please act as an impartial judge and evaluate the messages provided below. Your evaluation should be based on the mentioned criteria. 
+
+    [Criteria]
+
+    {{criteria}}
+
+    [The Start of Input]
+
+    {{messages}}
+
+    [The End of Input]
+    [Evaluation With Rating in JSON format]
+        
+classification: |
+    [Instruction]
+
+    You must classify the following messages into one and exactly one of the classes given, and provide a string explanation for your decision by strictly following this JSON format: '{"explanation": explanation, "class": class, }, for example: '{"explanation": "explanation", "class": CLASS}.
+
+    Please act as an impartial judge and classify the messages provided below. Your evaluation should be based on the mentioned criteria. 
+
+    [Criteria]
+
+    {{criteria}}
+
+    [Classes]
+
+    {{classes}}
+
+    [The Start of Input]
+
+    {{messages}}
+
+    [The End of Input]
+    [Evaluation With Class in JSON format]
+
+explanation_summary: |
+    [Instruction]
+
+    Pretend that you are an expert AI scientist and product manager. You will be given a list of explanations from humans who have reviewed the quality of an AI software.
+
+    Your task is to write a report based on the explanations. Your report should contain a numbered list of the most high impact judgments, both positive or negative.
+
+    Your summary should be short and concise. Start with "Here are the most common and interesting explanations for your app:".
+
+    [The Start of Input]
+
+    {{explanations}}
+
+    [The End of Input]
+    [Summary]
+
+summary: |
+    [Instruction]
+
+    Summarize this conversation's flow. Be succinct and use short bullet points in the format.
+
+    [The Start of Input]
+
+    {{messages}}
+
+    [The End of Input]
+
+    [Response Format]
+    Respond ONLY with your generated prompt in the following JSON format: {'summary': SUMMARY}, for example {'summary': 'Here is the summary of the conversation flow: ...'}.
+
+    [Summary]
+
+synthetic_user_prompt_generator: |
+    [Instruction]
+
+    As an LLM Agent instructor, you must design an instruction for a prudent Synthetic User Agent who is chatting with an AI with this objective to test it out.
+
+    [APP OBJECTIVE]
+    {{app}}
+
+    The Synthetic User Agent is someone who wants {{scenario}}. Your Synthetic User Agent will use a customer-facing application to test some features related to the scenario. Your instruction prompt should be creative and interesting to generate a diverse set of responses from the synthetic user agent for the scenario.
+
+    Command your Synthetic User Agent in instruction format, starting with: 'Pretend that you are {{persona}}. You are intelligent, curt, and direct human. Talk strictly in conversation format. Extremely important: ALL your responses should be ONE sentence only and no more. Start by introducing yourself and stating what you'd like to do.' followed by detailed instructions on how to proceed with the scenario. 
+
+    Respond ONLY with your generated prompt in the following JSON format: {'synth_user_system_prompt': GENERATED_USER_PROMPT}, for example {'synth_user_system_prompt': 'Pretend that you are...'}.

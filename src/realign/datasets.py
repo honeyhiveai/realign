@@ -1,5 +1,6 @@
-from realign.types import OpenAIMessage
 import json
+
+from realign.llm_utils import OpenAIMessage
 
 class Dataset:
     # TODO: async for to validate and load large datasets
