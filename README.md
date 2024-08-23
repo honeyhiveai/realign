@@ -47,23 +47,61 @@ Let's build an agent that produces content for your brand.
 
 > **Tweetbot**: generates N high quality tweets concurrently, evaluates them using Python code, HuggingFace classifiers, and LLM Judge (multiple runs, aggregated scores). 
 
-
-
 Please download and run this code!
 
-Code: [tweetbot.py](https://github.com/honeyhiveai/realign/blob/main/examples/tweetbot/tweetbot.py)
+### Code: [tweetbot.py](https://github.com/honeyhiveai/realign/blob/main/examples/tweetbot/tweetbot.py)
 
-Config: [config.yaml](https://github.com/honeyhiveai/realign/blob/main/examples/tweetbot/config.yaml)
+### Config: [config.yaml](https://github.com/honeyhiveai/realign/blob/main/examples/tweetbot/config.yaml)
 
+# [Tutorials](docs/TUTORIALS.md)
 
+1. [Simple Tweet Bot](docs/TUTORIALS.md#simple-tweet-bot): Generate tweets with any model using a prompt and template
+2. [Generate 10 Tweets in Parallel (Async)](docs/TUTORIALS.md#generate-10-tweets-in-parallel-async): Generate tweets concurrently using async
+3. [Using Config Files](docs/TUTORIALS.md#using-config-files): Setup config files to separate code and config
+4. [Set up Evaluators](docs/TUTORIALS.md#set-up-evaluators): Set up evaluator functions, new and built-in
+5. [Using Realign Evaluators](docs/TUTORIALS.md#using-realign-evaluators): Use evaluators with configs
 
-# Tutorials
+# [Concepts](docs/CONCEPTS.md)
 
-[Tutorials](docs/TUTORIALS.md)
+### 1. [@evaluator decorator](docs/CONCEPTS.md#evaluator-and-aevaluator)
 
-# Concepts
+Learn how you can set up evaluators, and configure them with
+- wrapping
+- transforming
+- aggregating
+- checking
+- other settings and kwargs
 
-[Concepts](docs/CONCEPTS.md)
+> An **Evaluator** is a function which *scores* your app's output and *checks* if the score is within a *target* range.
+
+### 2. [Simulation](docs/CONCEPTS.md#simulation)
+
+> A **Simulation** is a stochastic process that runs N times. It has statistical properties.
+
+![img](docs/site/sim_lifecycle.png) 
+
+### 3. [Agents](docs/CONCEPTS.md#agents)
+
+> An LLM agent comprises the settings, instructions, and context given to an LLM to autonomously complete a certain task.
+
+Set them up with
+- `agent_name`
+
+- the model settings
+  
+  - `model`: >100 providers/models
+  
+  - `hyperparams`: dictionary of OpenAI-type hyperparams
+
+- the prompt
+  
+  - `system_prompt`: a space for your agent's instructions
+  
+  - `template`: a template with variables marked with double curlies {{var}}
+  
+  - `template_params`: a dictionary mapping the variable names to their actual values
+  
+  - `json_mode`: a boolean flag which will deserialize the JSON response into a Python dict
 
 # Guides
 

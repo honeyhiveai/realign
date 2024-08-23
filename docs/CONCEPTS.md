@@ -1,5 +1,6 @@
 # Concepts
 
+
 ## @evaluator and @aevaluator
 
 What is an evaluator?
@@ -90,7 +91,11 @@ In Realign, a simulation lifecycle has 5 steps, shaped like a hamburger around y
 
 ## Agents
 
-An LLM agent is defined by its various settings. In Realign, you can configure your agents using the `llm_agents` key in your config file.
+What is an agent?
+
+> An LLM agent comprises the settings, instructions, and context given to an LLM to autonomously complete a certain task.
+
+In Realign, you can configure your agents using the `llm_agents` key in your config file.
 
 - `agent_name`: reference to the agent's defining settings
 

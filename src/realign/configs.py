@@ -75,11 +75,22 @@ class Config:
         # TODO: cleaner solution, circular import
         from realign.evaluators import evaluator, aevaluator, get_eval_settings
 
-        all_eval_settings, all_eval_kwargs = get_eval_settings(
+        config_eval_settings, config_eval_kwargs = get_eval_settings(
             yaml_file=self._config_path
         )
+        
+        '''
+        Logic to parse the config file.
+        - define evaluator class
+            - parse default config file
+        - initialize all evallib evaluators using default config file
+        
+        - user code
+            - if config.path is set, parse it and load its configs
+            - when user defines evaluators, use config.path configs
+        '''
 
-        for eval_name, eval_settings in all_eval_settings.items():
+        for eval_name, eval_settings in config_eval_settings.items():
             # create a wrapper eval if wraps is set
             if eval_settings.wraps is not None:
                 # get the wrapped evaluator
@@ -88,56 +99,57 @@ class Config:
                 assert isinstance(base_callable, evaluator)
 
                 if asyncio.iscoroutinefunction(base_callable.func):
-
+                    # make the wrapper eval
                     afunc = Config.create_wrapper(base_callable, 
                                                   eval_name, 
                                                   True)
 
-                    # make the wrapper eval
+                    # initialize the wrapper eval
                     aevaluator(
                         func=afunc,
-                        eval_settings=all_eval_settings[eval_name],
-                        eval_kwargs=all_eval_kwargs[eval_name],
+                        eval_settings=config_eval_settings[eval_name],
+                        eval_kwargs=config_eval_kwargs[eval_name],
                     )
                 else:
-                    func = Config.create_wrapper(base_callable, 
-                                                  eval_name, 
-                                                  False)
-
                     # make the wrapper eval
+                    func = Config.create_wrapper(base_callable,
+                                                 eval_name,
+                                                 False)
+
+                    # initialize the wrapper eval
                     evaluator(
                         func=func,
-                        eval_settings=all_eval_settings[eval_name],
-                        eval_kwargs=all_eval_kwargs[eval_name],
+                        eval_settings=config_eval_settings[eval_name],
+                        eval_kwargs=config_eval_kwargs[eval_name],
                     )
             
             # update the existing evaluator
+            # NOTE: this will override any args, kwargs, or deco_kwargs
             else:
+                # update the settings based on the config
+                if eval_name in evaluator.all_eval_settings:
+                    evaluator.all_evaluators[eval_name].eval_settings.update(
+                        config_eval_settings[eval_name]
+                    )
+                else:
+                    evaluator.all_eval_settings[eval_name] = config_eval_settings[eval_name]
 
-                # update their settings based on the config
-                for eval_name in evaluator.all_evaluators.keys():
-                    # update the settings
-                    if eval_name in all_eval_settings:
-                        if eval_name not in evaluator.all_eval_settings:
-                            evaluator.all_eval_settings[eval_name] = all_eval_settings[eval_name]
-                            
-                        evaluator.all_eval_settings[eval_name].update(all_eval_settings[eval_name])
-                        evaluator.all_evaluators[eval_name].eval_settings.update(
-                            all_eval_settings[eval_name]
-                        )
-
-                    # update the kwargs
-                    if eval_name in all_eval_kwargs:
-                        if eval_name not in evaluator.all_eval_kwargs:
-                            evaluator.all_eval_kwargs[eval_name] = all_eval_kwargs[eval_name]
-                        
-                        evaluator.all_eval_kwargs[eval_name].update(all_eval_kwargs[eval_name])
-                        evaluator.all_evaluators[eval_name].eval_kwargs.update(
-                            all_eval_kwargs[eval_name]
-                        )
-
-        # update the config path
-        print("Loaded config file:", self._config_path)
+                # update the kwargs based on the config
+                if eval_name in evaluator.all_eval_kwargs:
+                    evaluator.all_evaluators[eval_name].eval_kwargs.update(
+                        config_eval_kwargs[eval_name]
+                    )
+                else:
+                    evaluator.all_eval_kwargs[eval_name] = config_eval_kwargs[eval_name]
+                
+                # update the evaluator.eval_settings and kwargs based on the config
+                if eval_name in evaluator.all_evaluators:
+                    evaluator.all_evaluators[eval_name].eval_settings.update(
+                        config_eval_settings[eval_name]
+                    )
+                    evaluator.all_evaluators[eval_name].eval_kwargs.update(
+                        config_eval_kwargs[eval_name]
+                    )
 
 
 class ConfigPath:

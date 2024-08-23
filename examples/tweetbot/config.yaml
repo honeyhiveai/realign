@@ -48,7 +48,7 @@ llm_agents:
     template_params:
       platform: Twitter
       platform_instructions: |
-        Make sure the tweet is around 600-800 characters long.
+        Make sure the tweet is around 200-250 characters long.
       example: |
         Mixture-of-Agents as an Event-Driven System 🤖☎️
         This paper by @JunlinWang3 shows you how to ensemble smaller LLMs to create a system that can outperform state-of-the-art larger models.
@@ -90,7 +90,9 @@ llm_agents:
 evaluators:
 
   tweet_char_count:
-    asserts: on
+    checker: numrange(value, target)
+    target: (0, 280]
+    asserts: off
 
   hf_hate_classifier:
     wraps: hf_pipeline

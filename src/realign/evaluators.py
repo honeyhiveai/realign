@@ -4,6 +4,7 @@ from typing import Any, Optional, Callable, Coroutine, Awaitable
 import inspect
 import functools
 import os
+import json
 
 import realign
 from realign.configs import load_yaml_settings
@@ -67,7 +68,9 @@ class EvalSettings:
             update_dict = eval_settings.__dict__
         else:
             raise TypeError(
-                "eval_settings must be either a dictionary or an EvalSettings instance"
+                "eval_settings must be either a dictionary or an EvalSettings instance. Got {}".format(
+                    type(eval_settings)
+                )
             )
 
         valid_fields = {f.name for f in fields(self)}
@@ -78,6 +81,9 @@ class EvalSettings:
             if value is not None:  # Only update if the value is not None
                 setattr(self, key, value)
 
+    def __str__(self) -> str:
+        dict_str = {k: v for k, v in self.__dict__.items() if v is not None}
+        return json.dumps(dict_str, indent=4).replace('"', "")
 
 def extract_eval_settings_and_kwargs(settings: dict[str, Any]):
 
@@ -98,6 +104,8 @@ def get_eval_settings(
 ) -> tuple[EvalSettings, dict] | tuple[dict[str, EvalSettings], dict]:
 
     parsed_yaml = load_yaml_settings(yaml_file)
+    # update the config path
+    print("Parsed config file:", yaml_file)
 
     if not isinstance(parsed_yaml, dict):
         raise ValueError(
@@ -271,6 +279,8 @@ class evaluator:
     # ------------------------------------------------------------------------------
 
     all_evaluators: dict[str, "evaluator" | Callable | Coroutine | None] = dict()
+    
+    # parses the default config file and loads its settings and kwargs.
     all_eval_settings, all_eval_kwargs = get_eval_settings(
         yaml_file=os.path.join(os.path.dirname(__file__), realign.config.path)
     )
@@ -278,10 +288,15 @@ class evaluator:
     def __unnamed__(self, *args, **kwargs):
         raise NotImplementedError(f"Please decorate with an evaluator implementation.")
 
-    def __new__(cls, func=None, **kwargs):
+    def __new__(cls, 
+        func=None, 
+        eval_settings=None, 
+        eval_kwargs=None, 
+        **deco_kwargs
+    ) -> "evaluator":
         """Allows evaluator to be initialized in the decorator with kwargs"""
         if func is None:
-            return lambda f: cls(f, **kwargs)
+            return lambda f: cls(f, eval_settings, eval_kwargs, **deco_kwargs)
         return super().__new__(cls)
 
     def __init__(
@@ -300,20 +315,27 @@ class evaluator:
         else:
             self.name: str = str(func)
 
+        # default values >> default config >> init args >> decorator kwargs
+        # >> user config >> user init args >> user decorator kwargs
+        
+        # default values
+        self.eval_settings = EvalSettings(type=self.name)
+        self.eval_kwargs = dict()
+        
+        # default config
+        self.eval_settings.update(self.all_eval_settings.get(self.name, {}))
+        self.eval_kwargs.update(self.all_eval_kwargs.get(self.name, {}))
+        
+        # init args
+        self.eval_settings.update(eval_settings or {})
+        self.eval_kwargs.update(eval_kwargs or {})
+        
+        # decorator kwargs
         kwarg_eval_settings, kwarg_eval_kwargs = extract_eval_settings_and_kwargs(
             decorator_kwargs
         )
-
-        # fetch evaluator settings/kwargs from kwargs, then yaml, then defaults
-        default_evaluator = EvalSettings(type=self.name).copy()
-        self.eval_settings = eval_settings or self.all_eval_settings.get(
-            self.name, default_evaluator
-        )
-        self.eval_kwargs = eval_kwargs or self.all_eval_kwargs.get(self.name, dict())
-
-        # update the settings with the provided values
-        self.eval_kwargs.update(kwarg_eval_kwargs)
         self.eval_settings.update(kwarg_eval_settings)
+        self.eval_kwargs.update(kwarg_eval_kwargs)
 
         # set all_evaluators[func name] = this evaluator
         self.all_evaluators[self.name] = self
@@ -649,11 +671,7 @@ class evaluator:
         def single_evaluation() -> tuple[EvalResult, Any]:
 
             # run the evaluator
-            print('running evaluator', self.func.__name__)
-            print('func is coro:', asyncio.iscoroutinefunction(self.func.__call__))
-            print(f'fun {self.func.__name__} args {call_args} kwargs {call_kwargs}')
             score = self.func(*call_args, **call_kwargs)
-            print(f'score for {self.name}', score)
             result = self.get_result(score, *call_args, **call_kwargs)
 
             # transform
@@ -881,9 +899,3 @@ class aevaluator(evaluator):
 
 # instantiate all decorated evaluators in evallib
 from realign import evallib
-
-# this must be at the end since it will trigger the loading of default configs
-# before this, the evaluator class must be defined
-# all evaluators in evallib must be initialized
-# if config.path is set before this, it will lead to circular imports
-realign.config.path = os.path.join(os.path.dirname(__file__), 'defaults.yaml')

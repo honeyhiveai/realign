@@ -10,6 +10,9 @@ realign.config.path = 'config.yaml'
 def tweet_char_count(text: str) -> int:
     return len(text)
 
+# settings defined in your config.yaml
+print('\ntweet_char_count settings:', tweet_char_count.settings)
+
 class TweetBot(Simulation):
     
     async def setup(self, prompt):

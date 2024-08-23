@@ -30,8 +30,6 @@ async def arun_callables(funcs: list[Callable],
         
         is_coro = (hasattr(func, '__call__') and asyncio.iscoroutinefunction(func.__call__)) or asyncio.iscoroutinefunction(func)
         
-        print(f'func {func} is_coro: {is_coro}')
-        
         if is_coro:
             result = await func(*arg, **kwarg)
         else:
