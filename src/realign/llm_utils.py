@@ -32,8 +32,17 @@ class OpenAIMessage:
     role: str
     content: str | dict[str, str]
 
+    def __getitem__(self, key: str):
+        if key == 'role':
+            return self.role
+        elif key == 'content':
+            return self.content
+        else:
+            raise KeyError(key)
+
     def __dict__(self):
         return {"role": str(self.role), "content": str(self.content)}
+    
 
 
 @dataclass
@@ -152,7 +161,7 @@ class AgentSettings:
 
     def resolve_prompt_template(self, template_name_or_template: str):
         try:
-            template_path = os.path.join(os.path.dirname(__file__), "src/realign/templates.yaml")
+            template_path = os.path.join(os.path.dirname(__file__), "templates.yaml")
             with open(template_path, "r") as f:
                 prompts = yaml.load(f, Loader=yaml.FullLoader)
                 if template_name_or_template not in prompts:

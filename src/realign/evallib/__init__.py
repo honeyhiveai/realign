@@ -10,7 +10,7 @@ import string
 import re
 
 from realign.evaluators import evaluator, EvalResult, EvalSettings
-
+from realign.utils import bcolors
 
 # ------------------------------------------------------------------------------
 # LIBRARY OF EVALUATORS
@@ -24,7 +24,7 @@ def import_module(module_name):
         globals().update({name: getattr(module, name) for name in dir(module) if not name.startswith('_')})
         return module
     except ImportError as e:
-        warnings.warn(f"Failed to import {module_name}: {str(e)}. Some functionality may be unavailable.")
+        warnings.warn(f"{bcolors.FAIL}Failed to import {module_name}: {str(e)}. Some functionality may be unavailable.{bcolors.ENDC}")
         return None
 
 # Attempt imports with warnings

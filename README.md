@@ -1,10 +1,8 @@
 # Realign: Evaluation & Experimentation Framework for AI Applications
 
-![realign_banner.png](site/realign_banner.png)
+![realign_banner.png](docs/site/realign_banner.png)
 
 `realign` is an evaluation and experimentation framework for building reliable AI applications through test-driven development. Test and evaluate agent architectures, RAG systems, prompts, and models across hundreds of scenarios specific to your use-case.
-
-
 
 ### 🎯 With Realign, you can:
 
@@ -21,8 +19,6 @@
 - **Blazing Fast Execution:** Speed up your evaluations with parallel processing and async capabilities, with built-in modules for smart rate limiting
 - **Statistical Rigor:** Use statistics to test hypotheses and sweep hyperparameters to optimize performance
 
-
-
 # Quickstart
 
 ## Installation & Setup
@@ -32,8 +28,6 @@ To install the package, run
 ```bash
 pip install realign
 ```
-
-
 
 Set your API keys as environment variables:
 
@@ -47,33 +41,43 @@ or put them in a `.env` file:
 OPENAI_API_KEY="your_openai_key"
 ```
 
+## Tweet Generator
+
+Let's build an agent that produces content for your brand.
+
+> **Tweetbot**: generates N high quality tweets concurrently, evaluates them using Python code, HuggingFace classifiers, and LLM Judge (multiple runs, aggregated scores). 
+
+
+
+Please download and run this code!
+
+Code: [tweetbot.py](https://github.com/honeyhiveai/realign/blob/main/examples/tweetbot/tweetbot.py)
+
+Config: [config.yaml](https://github.com/honeyhiveai/realign/blob/main/examples/tweetbot/config.yaml)
+
 
 
 # Tutorials
+
 [Tutorials](docs/TUTORIALS.md)
 
-
 # Concepts
-coming soon!
 
+[Concepts](docs/CONCEPTS.md)
 
 # Guides
 
 - [TODO] how do I evaluate my agent?
 
-- [TODO]how to I customize my evaluator?
+- [TODO] how to I customize my evaluator?
 
-- [TODO]how do I improve my agent?
+- [TODO] how do I improve my agent?
 
-- [TODO]how do I improve my RAG pipeline?
-  
-  
+- [TODO] how do I improve my RAG pipeline?
 
 # API Reference
 
 coming soon!
-
-
 
 # Contributing
 
@@ -150,35 +154,3 @@ If you need help or have questions, you can:
 ### Code of Conduct
 
 We follow the [Contributor Covenant Code of Conduct](https://www.contributor-covenant.org/). Please read and adhere to it in all interactions within our community.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

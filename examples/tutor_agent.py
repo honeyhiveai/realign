@@ -14,7 +14,7 @@ class TutorSimulation(ChatSimulation):
         self.app = ChatAgent(system_prompt='Talk to the user seriously.')
         self.agent = ChatAgent(role='user')
 
-    async def coroutine(self, run_id: int) -> State:
+    async def main(self, run_id: int) -> State:
         
         # synthetic_user = self.synthetic_users[run_id]
         
@@ -29,12 +29,3 @@ class TutorSimulation(ChatSimulation):
 
 sim = TutorSimulation()
 sim.run(3)
-sim.push_runs_to_dataset('data/run_data.json')
-
-
-# TODO
-# how to make your sync code async
-# make template params easier to use
-# YAML configs
-# async utilities
-# trick with example in comments at the bottom as copilot guide

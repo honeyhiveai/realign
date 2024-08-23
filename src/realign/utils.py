@@ -1,5 +1,5 @@
 import asyncio
-from typing import Callable, Any, Coroutine
+from typing import Callable, Any, Coroutine, Optional
 
 class bcolors:
     HEADER = "\033[95m"
@@ -11,37 +11,40 @@ class bcolors:
     ENDC = "\033[0m"
     BOLD = "\033[1m"
     UNDERLINE = "\033[4m"
-
-async def arun_callables(funcs: list[Callable], args: list[list] = [[]], kwargs: list[dict] = None) -> list[Any]:
     
-    if len(funcs) != len(args):
-        raise Exception("funcs and args must be the same length.")
-    
-    if kwargs:
-        if len(funcs) != len(kwargs):
-            raise Exception("funcs, args, and kwargs must all be the same length.")
-    else:
-        # empty kwargs
-        kwargs = [dict() for _ in range(len(funcs))]
+async def arun_callables(funcs: list[Callable], 
+                         args: Optional[list[list]] = None, 
+                         kwargs: Optional[list[dict]] = None) -> list[Any]:
+    if args is None:
+        args = [[]] * len(funcs)
+    if kwargs is None:
+        kwargs = [{}] * len(funcs)
 
-    async_tasks = []
-    sync_tasks = []
-    for func, arg, kwarg in zip(funcs, args, kwargs):
-        if asyncio.iscoroutinefunction(func):
-            async_tasks.append(func(*arg, **kwarg))
+    if len(funcs) != len(args) or len(funcs) != len(kwargs):
+        raise ValueError("funcs, args, and kwargs must all be the same length.")
+
+    async def run_task(index: int, 
+                       func: Callable, 
+                       arg: list, 
+                       kwarg: dict) -> tuple[int, Any]:
+        
+        is_coro = (hasattr(func, '__call__') and asyncio.iscoroutinefunction(func.__call__)) or asyncio.iscoroutinefunction(func)
+        
+        print(f'func {func} is_coro: {is_coro}')
+        
+        if is_coro:
+            result = await func(*arg, **kwarg)
         else:
-            sync_tasks.append((func, arg, kwarg))
+            result = await asyncio.to_thread(func, *arg, **kwarg)
+        return index, result
 
-    # run the async tasks in parallel
-    async_results = await asyncio.gather(*async_tasks)
-    
-    # run the sync tasks in serial
-    sync_results = []
-    for func, arg, kwarg in sync_tasks:
-        sync_results.append(func(*arg, **kwarg))
-    # combine the async and sync results
-    results = async_results + sync_results
-    return results
+    tasks = [
+        asyncio.create_task(run_task(i, func, arg, kwarg))
+        for i, (func, arg, kwarg) in enumerate(zip(funcs, args, kwargs))
+    ]
+
+    results = await asyncio.gather(*tasks)
+    return [result for _, result in sorted(results, key=lambda x: x[0])]
 
 
 

@@ -1,45 +1,44 @@
+import numpy as np
 
 from realign.evaluators import aevaluator, evaluator
 from realign.llm_utils import allm_messages_call
 
 
 @aevaluator
-async def llm_rating_json(criteria=None, 
-                          messages=None,
-                          agent_settings=None):
-    
+async def llm_rating_json(messages=None, criteria=None, agent_settings=None):
+
     message = await allm_messages_call(
-        template='rating_5_star',
-        template_params={
-            'messages': messages,
-            'criteria': criteria
-        },
-        agent_settings=agent_settings
+        template="rating_5_star",
+        template_params={"messages": messages, "criteria": criteria},
+        agent_settings=agent_settings,
     )
+    
     return message.content
+
 
 @aevaluator
 async def llm_rating_json_aggregate(values: tuple[dict[str, str]]):
     # rating_5_star returns a json with an explanation and a rating
-    
+
     # derive the mean rating
     # derive the explanation summary
-    
-    mean_rating = sum(float(v['rating']) for v in values) / len(values)
-    
-    
-    explanations = ''
+
+    ratings = np.array([float(v["rating"]) for v in values])
+    rating_mean = np.mean(ratings)
+    rating_variance = np.var(ratings)
+
+    explanations = ""
     for i, v in enumerate(values):
         explanations += f'Explanation {i+1}: {v["explanation"]}\n'
-        
+
     explanation_summary = await allm_messages_call(
-        template='explanation_summary',
-        template_params={
-            'explanations': explanations
-        }
+        template="explanation_summary",
+        template_params={"explanations": explanations}
     )
-    
+
     return {
-        'rating': mean_rating,
-        'explanation_summary': explanation_summary.content
+        "rating_mean": float(rating_mean), 
+        "rating_variance": float(rating_variance),
+        "explanation_summary": str(explanation_summary.content),
+        "raw_ratings": list(ratings),
     }

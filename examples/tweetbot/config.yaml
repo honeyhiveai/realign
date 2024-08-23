@@ -7,9 +7,13 @@ llm_agents:
     template: |
       Pretend that you are a professional content writer who writes good content. Write a detailed instruction for an AI content writer which instructs it create the content that the user is asking for, suited for the {{ platform }} platform.
 
-      Here is the user request: {{ user_request }}
+      Make sure to instruct the AI to be specific, direct, and professional.
 
-      Respond ONLY with the instruction and NOTHING else in your response.
+      Here is the user request: I want to {{ user_request }}
+
+      Keep your prompt SHORT with no more than 5 bullet points.
+
+      Respond ONLY with the final instruction and NOTHING else in your response.
 
   content_agent: &content_agent
     model: openai/gpt-4o-mini
@@ -82,15 +86,36 @@ llm_agents:
 
         Slides from my OSS4AI talk on this topic: https://lnkd.in/eHjhkkV9
 
-  eval_agent:
-    model: openai/gpt-4o-mini
-    template: rating_5_star
-    template_params:
-      criteria: |
-        1. Make sure sentences are concise and don't use flowery language.
-        2. It shouldn't sound too salesy or promotional.
-        3. Don't use too many adjectives or adverbs.
-        4. Don't make general claims.
-        5. Don't start with a question.
-    json_mode: on
 
+evaluators:
+
+  tweet_char_count:
+    asserts: on
+
+  hf_hate_classifier:
+    wraps: hf_pipeline
+    task: text-classification
+    model: facebook/roberta-hate-speech-dynabench-r4-target
+
+    checker: value['label'] in target
+    target: [nothate]
+    asserts: on
+
+  hf_sentiment_classifier:
+    wraps: hf_pipeline
+    task: text-classification
+    model: cardiffnlp/twitter-roberta-base-sentiment-latest
+
+    checker: value['label'] in target
+    target: [positive, neutral]
+    asserts: on
+
+  tweet_judge:
+    wraps: llm_rating_json
+
+    criteria: |
+      1. Make sure sentences are concise and don't use flowery language.
+      2. It shouldn't sound too salesy or promotional.
+      3. Don't use too many adjectives or adverbs.
+      4. Don't make general claims.
+      5. Don't start with a question.

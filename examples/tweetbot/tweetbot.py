@@ -3,31 +3,38 @@ from realign.llm_utils import allm_messages_call
 from realign.evaluators import evaluator
 
 import realign
-realign.config.path = 'examples/simulation_with_config/config.yaml'
+realign.config.path = 'config.yaml'
+
+
+@evaluator
+def tweet_char_count(text: str) -> int:
+    return len(text)
 
 class TweetBot(Simulation):
     
-    async def setup(self):
+    async def setup(self, prompt):
         
+        # write prompt
         message = await allm_messages_call(
                 agent_name='prompt_writer', 
                 template_params={
-                    'user_request': 'Write a post on the negative impacts of AI',
+                    'user_request': prompt,
                     'platform': 'Twitter',
                 },
             )
         self.tweet_prompt = message.content
         print('tweet_prompt', self.tweet_prompt)
         
+        # set up evaluators
         self.evaluators = evaluator[
-            'hf_hate_speech', 
-            'hf_sentiment_classifier'
+            'tweet_char_count',
+            'hf_hate_classifier',
+            'tweet_judge',
         ]
-        
-        self.tweet_prompt = 'Write a post on the negative impacts of AI'
 
     async def main(self, run_context) -> None:
         
+        # write tweet
         message = await allm_messages_call(
                             agent_name='twitter_content_agent', 
                             messages=[{
@@ -43,5 +50,5 @@ class TweetBot(Simulation):
         return message.content
 
 
-sim = TweetBot()
+sim = TweetBot('Write a post on the use of simulation and evaluation in AI.')
 sim.run(3)

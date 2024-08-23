@@ -2,14 +2,13 @@
 
 Realign is a tool to test and evaluate your LLM agents blazing fast. We'll provide you with the rools to make 100s of LLM calls in parallel, with ANY model.
 
-
 [Introduction to LLM Agents](#introduction-to-llm-agents)
+
 1. [Simple Tweet Bot](#simple-tweet-bot)
 2. [Generate 10 Tweets in Parallel (Async)](#generate-10-tweets-in-parallel-async)
 3. [Using Config Files](#using-config-files)
 4. [Set up Evaluators](#set-up-evaluators)
 5. [Using Realign Evaluators](#using-realign-evaluators)
-
 
 ### Introduction to LLM Agents
 
@@ -21,7 +20,7 @@ Let's start by creating a simple Twitter (X?) bot:
 from realign.llm_utils import llm_messages_call
 
 def tweetbot(prompt: str) -> str:
-    
+
     new_message = llm_messages_call(
         messages=[{
             "role": "user", 
@@ -30,7 +29,7 @@ def tweetbot(prompt: str) -> str:
     )
 
     print('\nTweet:\n\n', new_message.content, '\n\n')
-    
+
 tweetbot("Write a tweet about best practices for prompt engineering")
 ```
 
@@ -55,8 +54,6 @@ Tweet:
 
 Great! The logs start by telling you which model you are using. The `model router` protects you from rate limits and handles retries.
 
-
-
 You must have noticed that the default model is `openai/gpt-4o-mini`. To change your model, simply enter a new model using `model=`.
 
 ```python
@@ -71,17 +68,11 @@ You must have noticed that the default model is `openai/gpt-4o-mini`. To change 
 
 Realign leverages LiteLLM to help you plug in any model in a single line of code using the format `<provider>/<model>`. You can find their 100+ supported models [here](https://docs.litellm.ai/docs/providers).
 
-
-
 #### Generate 10 Tweets in Parallel (Async)
 
 Now let's assume you want to create 10 tweets and see which one looks best.
 
-
-
 You could do this by calling `llm_messages_call` 10 times. However, this would be slow. Let's try it:
-
-
 
 ```python
 from realign.llm_utils import llm_messages_call
@@ -89,7 +80,7 @@ import time
 
 
 def tweet(prompt, i):
-    
+
     new_message = llm_messages_call(
         messages=[{
             "role": "user", 
@@ -103,15 +94,13 @@ def tweet(prompt, i):
 def main(prompt):
     for i in range(10):
         tweet(prompt, i)
-    
+
 start_time = time.time()
 
 main("Write a tweet about best practices for prompt engineering")
 
 print(f'Total time: {time.time() - start_time:.2f} seconds')
 ```
-
-
 
 You should see something like:
 
@@ -148,7 +137,7 @@ import time
 
 
 async def tweet(prompt, i):
-    
+
     new_message = await allm_messages_call(
         messages=[{
             "role": "user", 
@@ -160,22 +149,20 @@ async def tweet(prompt, i):
 
 
 def main(prompt):
-    
+
     tasks = []
     for i in range(10):
         tasks.append(tweet(prompt, i))
 
     # run the tasks in parallel
     run_async(tasks)
-    
+
 start_time = time.time()
 
 main("Write a tweet about best practices for prompt engineering")
 
 print(f'Total time: {time.time() - start_time:.2f} seconds')
 ```
-
-
 
 You should see something like:
 
@@ -202,11 +189,7 @@ Tweet 1:
 Total time: 2.47 seconds
 ```
 
-
-
 The total time is now the time taken by the **longest API call** instead of the total time taken by all calls. This allows you to iterate much quicker!
-
-
 
 Here's a summary of the main changes compared to the synchronous run:
 
@@ -218,8 +201,6 @@ Here's a summary of the main changes compared to the synchronous run:
 
 - Finally, we use the `run_async` utility which takes a single list of coroutines, and waits until they are all complete. If `tweet` returned something, the `run_async` function would return a list of returns.
 
-
-
 ### Using Config Files
 
 #### Tweet Bot with Template
@@ -230,7 +211,7 @@ You might want the Tweet to follow certain rules and patterns. To do this, we ca
 from realign.llm_utils import allm_messages_call, run_async
 
 async def tweet(prompt, i):
-    
+
     new_message = await allm_messages_call(
         messages=[{
             "role": "user", 
@@ -242,7 +223,7 @@ async def tweet(prompt, i):
 
 
 def main(prompt):
-    
+
     tasks = []
     for i in range(10):
         tasks.append(tweet(prompt, i))
@@ -281,25 +262,15 @@ Here is your instruction:
 '''
 
 main(template)
-
 ```
-
-
 
 However, this is somewhat difficult to maintain in a file which should ideally only have your code! Realign uses YAML configuration files to keep track of all settings that are stateless (things that don't depend on the application runtime state).
 
-
-
 This can include things like model, system_prompt, template, temperature, etc. 
-
-
 
 Let's use a config file for this example. Create a `config.yaml` file in your directory, and paste the following:
 
-
-
 ```yaml
-
 llm_agents:
   tweetbot:
     model: openai/gpt-4o-mini
@@ -329,7 +300,6 @@ llm_agents:
       Here is your instruction:
 
       {{prompt}}
-
 ```
 
 Some notes on the YAML file:
@@ -342,8 +312,6 @@ Some notes on the YAML file:
 
 You can find the full specification for the YAML config [here](#TODO).
 
-
-
 We can import the config by setting the global path in our code:
 
 ```python
@@ -355,7 +323,7 @@ We can use this agent in our code by modifying the `allm_messages_call` params:
 
 ```python
 async def tweet(prompt, i):
-    
+
     new_message = await allm_messages_call(
         agent_name='tweetbot',
         template_params={'prompt': prompt}
@@ -369,8 +337,6 @@ Finally, we just call `main` with our prompt:
 ```python
 main("Write a tweet about best practices for prompt engineering")
 ```
-
-
 
 Running this will use the config file settings to run your agent. To make changes to the agent's config, you can make changes to the agent config directly. This allows you to quickly play with various settings including:
 
@@ -387,8 +353,6 @@ Running this will use the config file settings to run your agent. To make change
 - json_mode (bool)
 
 - role ('assistant' / 'user')
-  
-  
 
 For example, we can set the temperature to 1 by adding the following line:
 
@@ -402,8 +366,6 @@ llm_agents:
       As an AI language model, ...
 ```
 
-
-
 ### Set up Evaluators with Config Files
 
 Now that you have a Tweet agent that can generate tweets quickly, you might want to evaluate the responses to get make sure the quality is high. To do this, we can set up evaluators.
@@ -411,7 +373,6 @@ Now that you have a Tweet agent that can generate tweets quickly, you might want
 But what is an evaluator?
 
 > An **Evaluator** is a function which *scores* your app's output and *checks* if the score is within a *target* range.
-
 
 There are a few ways to implement Evaluators:
 
@@ -421,8 +382,6 @@ There are a few ways to implement Evaluators:
 
 - LLM Evaluator: these use an LLM to generate a score for your application
 
-
-
 Let's build 4 evaluators:
 
 1. Tweet should be under 280 characters (simple Python function)
@@ -431,9 +390,7 @@ Let's build 4 evaluators:
 
 3. Tweet should be of positive sentiment (Hugginface model)
 
-4. The content of the Tweet should be high quality (LLM call)
-
-
+4. Tweet should score highly on specified criteria (LLM call)
 
 #### Eval 1: Tweet should be under 280 characters
 
@@ -447,7 +404,7 @@ def tweet_length_checker(tweet_text):
 
     # assert that score is within target range
     assert 0 < num_chars <= 280
-    
+
     # Evaluation Result
     return eval_result
 ```
@@ -472,7 +429,7 @@ def hate_speech_detection(tweet_text):
     # Evaluation = assert that score(output) within target range
     # score = hate / nothate
     # target = nothate
-    
+
     # Check if MPS is available (Mac Apple Silicon)
     if torch.backends.mps.is_available():
         device = torch.device("mps")
@@ -485,12 +442,12 @@ def hate_speech_detection(tweet_text):
     pipe = pipeline(task='text-classification', 
                     model='facebook/roberta-hate-speech-dynabench-r4-target',
                     device=device)
-    
+
     # get the response
     response = pipe(tweet_text)
-    
+
     assert response[0]['label'] == 'nothate'
-    
+
     return response[0]['label']
 ```
 
@@ -499,8 +456,6 @@ This will return something like
 ```python
 [{'label': 'nothate', 'score': 0.9998}]
 ```
-
-
 
 #### Eval 3: Tweet should have positive sentiment
 
@@ -514,7 +469,7 @@ def hate_speech_detection(tweet_text):
     # Evaluation = assert that score(output) within target range
     # score = positive / neutral / negative
     # target = [positive, neutral]
-    
+
     # Check if MPS is available (Mac Apple Silicon)
     if torch.backends.mps.is_available():
         device = torch.device("mps")
@@ -527,26 +482,21 @@ def hate_speech_detection(tweet_text):
     pipe = pipeline(task='text-classification', 
                     model='cardiffnlp/twitter-roberta-base-sentiment-latest',
                     device=device)
-    
+
     # get the response
     response = pipe(tweet_text)
-    
-    
+
+
     assert response[0]['label'] in ['positive', 'neutral']
-    
+
     return response[0]
 ```
 
-
-
 Feeling icky with all the code duplication? In Realign, we can pull out all the static / stateless settings into the config file. This helps you cleanly manage your evaluators. Moreover, Realign provides in-built configurations and evaluators.
-
-
 
 #### Using Realign Evaluators
 
 In Realign, any Python function can be converted to an Evaluator using the `@evaluator` decorator. If your function is async, you can use the `@aevaluator` decorator. 
-
 
 In our case, Realign @evaluator can help you create a wrapper around a base implementation of Huggingface pipeline, abstracting out any hyperparams you like. 
 
@@ -557,8 +507,6 @@ We'll do this in 3 steps:
 2. Create a config file and add the Huggingface evaluator settings
 
 3. Use these evaluators in your code
-
-
 
 Let's begin:
 
@@ -592,9 +540,6 @@ def hf_pipeline(tweet_text, task=None, model=None):
     response = pipe(tweet_text)
 
     return response[0]
-
-
-
 ```
 
 2. **Create a config file and add the Huggingface evaluator settings**
@@ -611,16 +556,15 @@ evaluators:
         checker: value['label'] in target
         target: [nothate]
         asserts: on
- 
+
     hf_sentiment_classifier:
         wraps: hf_pipeline
         task: text-classification
         model: cardiffnlp/twitter-roberta-base-sentiment-latest
-        
+
         checker: value['label'] in target
         target: [positive, neutral]
         asserts: on
-        
 ```
 
 3. **Use these evaluators in your code**
@@ -629,44 +573,52 @@ We can update our tweet function as follows:
 
 ```python
 async def tweet(prompt, i):
-    
+
     new_message = await allm_messages_call(
         agent_name='tweetbot',
         template_params={'prompt': prompt}
     )
-    
+
     # evaluate for hate speech
     evaluators['hf_hate_speech'](new_message.content)
-    
+
     # evaluate for positive sentiment 
     evaluators['hf_sentiment_classifier'](new_message.content)
-    
 ```
 
+Using the YAML file helps you tweak different hyperparameters and settings easily wihthout changing your code. For example, you can change the model or task, or adjust the target classes. This is a convenient way to adjust hyperparams for various wrappers. Of course, you can manually create your own wrappers as well.
 
+Let's quickly switch to configs for our `tweet_length_checker` evaluator as well:
 
-Using the YAML file helps you tweak different hyperparameters and settings easily wihthout changing your code. For 
+```python
+@evaluator
+def tweet_char_count(text: str) -> int:
+    return len(text)
+```
 
+```yaml
+evaluators:
+    # ... other evaluators
 
+    tweet_length_checker:
+        checker: numrange(value, target)
+        target: (0, 280]
+        asserts: on
+```
 
-The benefit of this is even greater when we use evaluators for LLM evaluators.
+#### Eval 4: Tweet should score highly on specified criteria (LLM call)
 
+LLMs have great language and reasoning skills, and so we can use them to evaluate the responses of another LLM.
 
+We can use Realign's `llm_rating_json` evaluator, which is already implemented for you. You can check out its configuration [here](#TODO). TL;DR: it uses the criteria to evaluate the messages, repeats it 3 times and aggregates the scores and explanations. 
 
-#### @evaluator settings
-
-Any function decorated with @evaluator will fetch the configs for that evaluator
-
-- `wraps`: wrap a base evaluator with the settings specified in this config to create a new evaluator
-
-- `transform`: apply a Python code transformation after your evaluator is executed. Useful for mapping / filtering your output. You can reference other evaluators here too.
-
-- `repeat`: number of times to repeat the evaluator (useful for stochastic evaluators such as LLM judges)
-
-- `aggregate`: apply a Python code aggregation on your evaluator's output, after the repeats and transformation (if specified). This can help you reduce a list of outputs to a single one, maybe by taking the mean score.
-
-- `checker`: apply a Python code check whether the output is in the target range
-
-- `asserts`: apply the Python `assert` keyword to final output
-
-- `**kwargs`: any additional key-value pairs are passed in as keyword arguments to the evaluator function. This is useful for domain or task specific evaluators.
+```yaml
+tweet_judge:
+    wraps: llm_rating_json
+    criteria: |
+      1. Make sure sentences are concise and don't use flowery language.
+      2. It shouldn't sound too salesy or promotional.
+      3. Don't use too many adjectives or adverbs.
+      4. Don't make general claims.
+      5. Don't start with a question.
+```

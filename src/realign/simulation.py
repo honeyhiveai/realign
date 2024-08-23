@@ -2,7 +2,7 @@ import asyncio
 import json
 import os
 import inspect
-from typing import Any, Self, Callable, Coroutine, Optional
+from typing import Any, Callable, Coroutine, Optional
 from dataclasses import dataclass, field
 
 from dotenv import load_dotenv
@@ -31,6 +31,9 @@ from realign.utils import arun_callables, bcolors
 class Context:
     run_id: int
     
+    sim_args: list[Any] = field(default_factory=list)
+    sim_kwargs: dict[str, Any] = field(default_factory=dict)
+    
     initial_state: Optional[State] = None
     final_state: Optional[State] = None
     
@@ -39,7 +42,11 @@ class Context:
 
 class Simulation:
     
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        
+        self.sim_args = args
+        self.sim_kwargs = kwargs
+        
         self.runs = None
         
         # if provided, set the router settings to honor rate limits
@@ -52,7 +59,7 @@ class Simulation:
         self.run_data: dict[int, RunData] = dict()
         self.eval_results: dict[int, list[EvalResult]] = dict()
 
-    async def setup(self):
+    async def setup(self, *args, **kwargs):
         '''Sets up objects used in the simulation'''
         
         # simulation components accessible to main
@@ -70,13 +77,14 @@ class Simulation:
     async def after_each(self, run_context: Context):
         '''Runs synchronously after each simulation run'''
         
+        # run the evaluators
         if self.evaluators and len(self.evaluators) > 0:
             
             # NOTE: final_state is assumed to be read only
             args = [(run_context.final_state,) for _ in range(len(self.evaluators))]
             
             eval_scores = await arun_callables(funcs=self.evaluators,
-                                         args=args)
+                                                args=args)
             
             # save the evaluation results
             run_context.eval_results = eval_scores
@@ -91,7 +99,7 @@ class Simulation:
             
         else:
             run_context.eval_results = []
-        
+    
         
     async def windup(self):
         '''Runs synchronously after all simulation runs'''
@@ -124,10 +132,13 @@ class Simulation:
         
         try:
             # set up the thread contexts
-            self.run_contexts: list[Context] = [Context(run_id) for run_id in range(self.runs)]
+            self.run_contexts: list[Context] = [
+                Context(run_id, self.sim_args, self.sim_kwargs) 
+                for run_id in range(self.runs)
+            ]
             
             # setup
-            await self.setup()
+            await self.setup(*self.sim_args, **self.sim_kwargs)
             
             # before_each, main, after_each
             simulation_run_tasks = [
@@ -164,7 +175,7 @@ class Simulation:
                 print(json.dumps(model_stats, indent=4).replace('"', ''))
             print('-'*100 + '\n\n')
 
-    def run(self, runs: int = 3) -> Self:
+    def run(self, runs: int = 3) -> 'Simulation':
         '''Runs the main event loop for the simulation'''
 
         # simulation is fundamentally a main that runs N times
@@ -189,8 +200,8 @@ class Simulation:
     
     def print_evals(self, run_context: Context):
         print(bcolors.WARNING)
-        for e in run_context.eval_results:
-            print(e)
+        for i, e in enumerate(run_context.eval_results):
+            print(self.evaluators[i].name, ":", e)
             print("- " * 50)
         print(bcolors.ENDC)    
     

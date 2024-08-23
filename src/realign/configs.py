@@ -2,6 +2,7 @@ import yaml
 import os
 from typing import Optional
 import asyncio
+import inspect
 
 import realign
 
@@ -17,9 +18,18 @@ class Config:
         self._config_path = DEFAULT_CONFIG_PATH
 
     def __set__(self, _, path):
+        
+        # get the path of the caller of this function using inspect
+        caller_path = inspect.stack()[1].filename
+        
+        dir_path = os.path.join(os.path.dirname(caller_path), 'config.yaml')
 
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"Config file not found at {path}")
+        if os.path.exists(path):
+            path = path
+        elif os.path.exists(dir_path):
+            path = dir_path
+        else:
+            raise FileNotFoundError(f"Config file not found at {path} or {dir_path}.")
 
         # if path unchanged, return
         # if self._config_path == path:
@@ -46,6 +56,19 @@ class Config:
 
     def __call__(self):
         self.load_config()
+    
+    @staticmethod
+    def create_wrapper(base_callable, eval_name, coroutine):
+        if coroutine:
+            async def afunc(*args, **kwargs):
+                return await base_callable(*args, **kwargs)
+            afunc.__name__ = eval_name
+            return afunc
+        
+        def func(*args, **kwargs):
+            return base_callable(*args, **kwargs)
+        func.__name__ = eval_name
+        return func
 
     def load_config(self):
 
@@ -56,10 +79,8 @@ class Config:
             yaml_file=self._config_path
         )
 
-        evaluator.all_eval_settings.update(all_eval_settings)
-        evaluator.all_eval_kwargs.update(all_eval_kwargs)
-
         for eval_name, eval_settings in all_eval_settings.items():
+            # create a wrapper eval if wraps is set
             if eval_settings.wraps is not None:
                 # get the wrapped evaluator
                 assert isinstance(eval_settings.wraps, str)
@@ -68,49 +89,52 @@ class Config:
 
                 if asyncio.iscoroutinefunction(base_callable.func):
 
-                    async def afunc(*args, **kwargs):
-                        return await base_callable(*args, **kwargs)
+                    afunc = Config.create_wrapper(base_callable, 
+                                                  eval_name, 
+                                                  True)
 
-                    afunc.__name__ = eval_name
-
-                    # update the name of the wrapper evaluator
-                    wrapper_eval = aevaluator(
+                    # make the wrapper eval
+                    aevaluator(
                         func=afunc,
                         eval_settings=all_eval_settings[eval_name],
                         eval_kwargs=all_eval_kwargs[eval_name],
                     )
                 else:
+                    func = Config.create_wrapper(base_callable, 
+                                                  eval_name, 
+                                                  False)
 
-                    def func(*args, **kwargs):
-                        return base_callable(*args, **kwargs)
-
-                    func.__name__ = eval_name
-
-                    # update the name of the wrapper evaluator
-                    wrapper_eval = evaluator(
+                    # make the wrapper eval
+                    evaluator(
                         func=func,
                         eval_settings=all_eval_settings[eval_name],
                         eval_kwargs=all_eval_kwargs[eval_name],
                     )
+            
+            # update the existing evaluator
+            else:
 
-                # create a new evaluator with the wraps callable
-                evaluator.all_evaluators[eval_name] = wrapper_eval
+                # update their settings based on the config
+                for eval_name in evaluator.all_evaluators.keys():
+                    # update the settings
+                    if eval_name in all_eval_settings:
+                        if eval_name not in evaluator.all_eval_settings:
+                            evaluator.all_eval_settings[eval_name] = all_eval_settings[eval_name]
+                            
+                        evaluator.all_eval_settings[eval_name].update(all_eval_settings[eval_name])
+                        evaluator.all_evaluators[eval_name].eval_settings.update(
+                            all_eval_settings[eval_name]
+                        )
 
-        # update their settings based on the config
-        for eval_name in evaluator.all_evaluators.keys():
-            if eval_name in all_eval_settings and isinstance(
-                all_eval_settings[eval_name], evaluator
-            ):
-                evaluator.all_evaluators[eval_name].eval_settings.update(
-                    all_eval_settings[eval_name]
-                )
-
-            if eval_name in all_eval_kwargs and isinstance(
-                all_eval_settings[eval_name], evaluator
-            ):
-                evaluator.all_evaluators[eval_name].eval_kwargs.update(
-                    all_eval_kwargs[eval_name]
-                )
+                    # update the kwargs
+                    if eval_name in all_eval_kwargs:
+                        if eval_name not in evaluator.all_eval_kwargs:
+                            evaluator.all_eval_kwargs[eval_name] = all_eval_kwargs[eval_name]
+                        
+                        evaluator.all_eval_kwargs[eval_name].update(all_eval_kwargs[eval_name])
+                        evaluator.all_evaluators[eval_name].eval_kwargs.update(
+                            all_eval_kwargs[eval_name]
+                        )
 
         # update the config path
         print("Loaded config file:", self._config_path)
@@ -144,9 +168,18 @@ def load_yaml_settings(yaml_file: Optional[str] = None) -> dict[str, dict]:
         with open(yaml_file, "r") as f:
             yaml_content = f.read()
     except FileNotFoundError:
-        raise ValueError(
-            f"Config file '{yaml_file}' not found. Please check the path and try again."
-        )
+        # current directory / yaml file
+        try:
+            yaml_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), yaml_file)
+
+            with open(yaml_file, "r") as f:
+                yaml_content = f.read()
+                
+        except FileNotFoundError:
+            
+            raise ValueError(
+                f"Config file '{yaml_file}' not found. Please check the path and try again."
+            )
 
     # Parse YAML content
     try:

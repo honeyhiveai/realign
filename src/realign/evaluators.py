@@ -649,7 +649,11 @@ class evaluator:
         def single_evaluation() -> tuple[EvalResult, Any]:
 
             # run the evaluator
+            print('running evaluator', self.func.__name__)
+            print('func is coro:', asyncio.iscoroutinefunction(self.func.__call__))
+            print(f'fun {self.func.__name__} args {call_args} kwargs {call_kwargs}')
             score = self.func(*call_args, **call_kwargs)
+            print(f'score for {self.name}', score)
             result = self.get_result(score, *call_args, **call_kwargs)
 
             # transform
@@ -724,6 +728,7 @@ class evaluator:
         return old_settings, merged_kwargs
 
     def process_trace(self, results):
+        if results is None: return
         # if this is the first call, save the result.  Otherwise, add it to the list of previous runs
         if call_context["depth"] == 1:
             self._prev_run = results
@@ -751,37 +756,44 @@ class evaluator:
             else:
                 print("Error tracing results!")
 
-    def __call__(self, *args, **kwargs):
-
-        old_settings, merged_kwargs = self.pre_call(**kwargs)
-
+    # TODO: if there was an exception, save the result
+    def __call__(self, *args, **kwargs) -> Any:
+        
+        # RUN EVALUATOR
         try:
-
+            old_settings, merged_kwargs = self.pre_call(**kwargs)
             results, scores = None, None
-
-            # RUN EVALUATOR
             assert not asyncio.iscoroutinefunction(
                 self.func
             ), "please use @aevaluator instead of @evaluator for this function"
-
             results, scores = self.sync_call(*args, **merged_kwargs)
-
-        except Exception as e:
-            # TODO: if there was an exception, save the result
-            # results = EvalResult(e, init_method=self.name)
-            raise e
-
         finally:
-            if results:
-                self.process_trace(results)
-
+            self.process_trace(results)
         self.eval_settings = old_settings
-
         return scores
 
+    async def __acall__(self, *args, **kwargs) -> Any:
+        
+        # RUN EVALUATOR
+        try:
+            old_settings, merged_kwargs = self.pre_call(**kwargs)
+            results, scores = None, None
+            if asyncio.iscoroutinefunction(self.func):
+                results, scores = await self.async_call(*args, **merged_kwargs)
+            else:
+                results, scores = self.sync_call(*args, **merged_kwargs)
+        finally:
+            self.process_trace(results)
+        self.eval_settings = old_settings
+        return scores    
+    
+    
     def raw(self, *args, **kwargs):
         return self.func(*args, **kwargs)
 
+    async def araw(self, *args, **kwargs):
+        return await self.func(*args, **kwargs)
+    
     # ------------------------------------------------------------------------------
     # PROPERTIES
     # ------------------------------------------------------------------------------
@@ -857,32 +869,10 @@ class evaluator:
 class aevaluator(evaluator):
 
     async def __call__(self, *args, **kwargs):
-
-        old_settings, merged_kwargs = self.pre_call(**kwargs)
-
-        try:
-
-            # RUN EVALUATOR
-            if asyncio.iscoroutinefunction(self.func):
-                results, scores = await self.async_call(*args, **merged_kwargs)
-            else:
-                results, scores = self.sync_call(*args, **merged_kwargs)
-
-        except Exception as e:
-            # TODO: if there was an exception, save the result
-            # results = EvalResult(e, init_method=self.name)
-            raise e
-
-        finally:
-
-            self.process_trace(results)
-
-        self.eval_settings = old_settings
-
-        return scores
+        return await self.__acall__(*args, **kwargs)
 
     async def raw(self, *args, **kwargs):
-        return await self.func(*args, **kwargs)
+        return await self.araw(*args, **kwargs)
 
 
 # ------------------------------------------------------------------------------
@@ -892,4 +882,8 @@ class aevaluator(evaluator):
 # instantiate all decorated evaluators in evallib
 from realign import evallib
 
+# this must be at the end since it will trigger the loading of default configs
+# before this, the evaluator class must be defined
+# all evaluators in evallib must be initialized
+# if config.path is set before this, it will lead to circular imports
 realign.config.path = os.path.join(os.path.dirname(__file__), 'defaults.yaml')

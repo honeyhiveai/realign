@@ -10,7 +10,7 @@ llm_agents:
     template: rating_5_star
     json_mode: on
     hyperparams:
-      temperature: 0.5
+      temperature: 0
 
   explanation_summary_agent: &explanation_summary_agent
     model: openai/gpt-4o-mini
@@ -20,24 +20,6 @@ llm_agents:
       temperature: 0
 
 evaluators:
-
-  hf_hate_speech:
-    wraps: hf_pipeline
-    model: facebook/roberta-hate-speech-dynabench-r4-target
-    task: text-classification
-
-    checker: value['label'] in target
-    target: [nothate]
-    asserts: on
-
-  hf_sentiment_classifier:
-    wraps: hf_pipeline
-    task: text-classification
-    model: cardiffnlp/twitter-roberta-base-sentiment-latest
-
-    checker: value['label'] in target
-    target: [positive, neutral]
-    asserts: on
 
   llm_rating_json:
     repeat: 3

@@ -4,8 +4,7 @@ from realign.llm_utils import allm_messages_call, run_async
 from realign.evaluators import evaluator, aevaluator
 
 import realign
-realign.config.path = 'tutorials/tweetbot/config.yaml'
-
+realign.config.path = 'config.yaml'
 
 @evaluator
 def tweet_char_count(text: str) -> int:

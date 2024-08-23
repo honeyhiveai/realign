@@ -21,11 +21,10 @@ def hf_pipeline(tweet_text, task=None, model=None):
                     device=device)
 
     # get the response
-    print(f'\n\nRunning hf_pipeline with task {task} and model {model}\n\n')
+    print(f'\nRunning hf_pipeline with task {task} and model {model}\n')
     response = pipe(tweet_text)
 
     return response[0]
-    
 
 @evaluator
 def hf_label_score_aggregator(values):
