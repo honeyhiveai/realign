@@ -123,7 +123,7 @@ We welcome contributions from the community to help make Realign better. This gu
 
 ### Project Overview
 
-Realign is an MIT licensed testing framework for multi-turn AI applications. It simulates user interactions, evaluates AI performance, and generates adverserial test cases.
+Realign is an MIT licensed testing framework for multi-turn AI applications. It simulates user interactions, evaluates AI performance, and generates adversarial test cases.
 
 We particularly welcome contributions in the following areas:
 
