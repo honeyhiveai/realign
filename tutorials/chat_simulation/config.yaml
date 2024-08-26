@@ -10,7 +10,7 @@ llm_agents:
 
       Keep responses very concise (maximum 1 sentence) and to the point, and avoid jargon or complex terms.
 
-  synth_user_agent:
+  synth_student_agent_generator:
     model: openai/gpt-4o-mini
     json_mode: on
     template: synthetic_user_prompt_generator

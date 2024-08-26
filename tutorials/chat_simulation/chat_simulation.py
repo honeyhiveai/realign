@@ -12,15 +12,19 @@ realign.config.path = 'config.yaml'
 class TutorSimulation(ChatSimulation):
     
     async def before_each(self, run_context: Context):
+        
+        # generate a system prompt for the synthetic user before each run
         new_message = await allm_messages_call(
-            agent_name='synth_user_agent',
+            agent_name='synth_student_agent_generator',
         )
         run_context.synth_user_system_prompt = new_message.content['synth_user_system_prompt']
         
+        # print utilities
         print_run_id(run_context.run_id)
         print_system_prompt(run_context.synth_user_system_prompt, 'user')
         
     async def main(self, run_context: Context):
+        
         messages = []
         max_messages = self.max_messages or 3
         
@@ -33,6 +37,7 @@ class TutorSimulation(ChatSimulation):
             )
             messages.append(new_message)
             
+            # print utilities
             print_run_id(run_context.run_id)
             print(str_msgs(messages[-1]))
 
@@ -44,6 +49,8 @@ class TutorSimulation(ChatSimulation):
                 messages=messages
             )
             messages.append(new_message)
+            
+            # print utilities
             print_run_id(run_context.run_id)
             print(str_msgs(messages[-1]))
 
@@ -55,6 +62,8 @@ class TutorSimulation(ChatSimulation):
                 messages=messages
             )
             messages.append(new_message)
+            
+            # print utilities
             print_run_id(run_context.run_id)
             print(str_msgs(messages[-1]))
             

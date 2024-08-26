@@ -96,7 +96,6 @@ evaluators:
 
   llm_tweet_choice_judge:
     wraps: allm_choice_judge
-    batch_size: 2
     criteria: |
       1. Make sure sentences are concise and don't use flowery language.
       2. It shouldn't sound too salesy or promotional.
