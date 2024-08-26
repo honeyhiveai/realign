@@ -380,13 +380,18 @@ class evaluator:
 
     def post_apply_aggregation(
         self,
-        eval_results: tuple[EvalResult] | list[EvalResult],
+        eval_results: tuple[EvalResult] | list[EvalResult] | EvalResult,
         aggregate_score: Any,
     ):
         init_methods = set()
-        for eval_result in eval_results:
-            if type(eval_result) == EvalResult:
-                init_methods.add(eval_result.init_method)
+
+        # if no repetitions, we will only have one eval result
+        if type(eval_results) == EvalResult:
+            init_methods.add(eval_results.init_method)
+        else:
+            for eval_result in eval_results:
+                if type(eval_result) == EvalResult:
+                    init_methods.add(eval_result.init_method)
 
         init_method = "aggregate: "
         if len(init_methods) > 0:
@@ -400,8 +405,8 @@ class evaluator:
 
     def sync_apply_aggregation(
         self,
-        eval_results: tuple[EvalResult] | list[EvalResult],
-        eval_scores: tuple | list,
+        eval_results: tuple[EvalResult] | list[EvalResult] | EvalResult,
+        eval_scores: tuple | list | Any,
     ) -> tuple[EvalResult, Any]:
 
         if not self.eval_settings.aggregate:

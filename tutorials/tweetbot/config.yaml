@@ -32,6 +32,8 @@ llm_agents:
       {{prompt}}
 
 evaluators:
+
+
     
   hf_hate_speech:
     wraps: hf_pipeline
@@ -51,3 +53,12 @@ evaluators:
     target: [positive, neutral]
     asserts: on
 
+  tweet_judge:
+    wraps: llm_rating_json
+
+    criteria: |
+      1. Make sure sentences are concise and don't use flowery language.
+      2. It shouldn't sound too salesy or promotional.
+      3. Don't use too many adjectives or adverbs.
+      4. Don't make general claims.
+      5. Don't start with a question.

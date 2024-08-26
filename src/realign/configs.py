@@ -42,6 +42,7 @@ class Config:
                 config_content = yaml.safe_load(f)
             except yaml.YAMLError as exc:
                 print(exc)
+                raise
 
             if not ("llm_agents" in config_content or "evaluators" in config_content):
                 raise ValueError(

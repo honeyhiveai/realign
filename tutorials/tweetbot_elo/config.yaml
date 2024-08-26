@@ -40,7 +40,7 @@ llm_agents:
 
       {{ example }}
     hyperparams:
-      temperature: 0.7
+      temperature: 1
       max_tokens: 1024
 
   twitter_content_agent:
@@ -48,7 +48,7 @@ llm_agents:
     template_params:
       platform: Twitter
       platform_instructions: |
-        Make sure the tweet is around 200-250 characters long.
+        Make sure the tweet is long. Make sure you have an interesting perspective about the topic, don't just summarize.
       example: |
         Mixture-of-Agents as an Event-Driven System 🤖☎️
         This paper by @JunlinWang3 shows you how to ensemble smaller LLMs to create a system that can outperform state-of-the-art larger models.
@@ -94,30 +94,16 @@ evaluators:
     target: (0, 280]
     asserts: off
 
-  hf_hate_classifier:
-    wraps: hf_pipeline
-    task: text-classification
-    model: facebook/roberta-hate-speech-dynabench-r4-target
-
-    checker: value['label'] in target
-    target: [nothate]
-    asserts: on
-
-  hf_sentiment_classifier:
-    wraps: hf_pipeline
-    task: text-classification
-    model: cardiffnlp/twitter-roberta-base-sentiment-latest
-
-    checker: value['label'] in target
-    target: [positive, neutral]
-    asserts: on
-
-  tweet_judge:
-    wraps: llm_rating_json
-
+  llm_tweet_choice_judge:
+    wraps: allm_choice_judge
+    batch_size: 2
     criteria: |
       1. Make sure sentences are concise and don't use flowery language.
       2. It shouldn't sound too salesy or promotional.
       3. Don't use too many adjectives or adverbs.
       4. Don't make general claims.
       5. Don't start with a question.
+
+    aggregate: elo_ratings(values)
+
+

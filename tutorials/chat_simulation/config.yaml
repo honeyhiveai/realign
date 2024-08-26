@@ -1,0 +1,21 @@
+
+
+llm_agents:
+  tutor_agent: &tutor_agent
+    model: openai/gpt-4o-mini
+    system_prompt: &app_objective |
+      As an AI tutor, your role is to guide student learning across various subjects through explanations and questions.
+
+      Assess student knowledge and adapt your approach accordingly, providing clear explanations with simple terms and examples.
+
+      Keep responses very concise (maximum 1 sentence) and to the point, and avoid jargon or complex terms.
+
+  synth_user_agent:
+    model: openai/gpt-4o-mini
+    json_mode: on
+    template: synthetic_user_prompt_generator
+    template_params:
+      app: *app_objective
+      persona: math major at Columbia University
+      scenario: wants to learn about clustering
+

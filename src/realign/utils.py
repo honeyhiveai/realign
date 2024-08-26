@@ -46,7 +46,7 @@ async def arun_callables(funcs: list[Callable],
 
 
 
-def run_async(tasks: list[Coroutine] | Coroutine):
+def run_async(tasks: list[Coroutine] | Coroutine) -> Any | Coroutine:
     
     # run the tasks in parallel
     async def gather_async(*tasks):
@@ -59,6 +59,10 @@ def run_async(tasks: list[Coroutine] | Coroutine):
         coroutine = single_task(tasks)
     else:
         coroutine = gather_async(*tasks)
+        
+    # if we are in a running event loop, return coroutine
+    if asyncio.get_event_loop().is_running():
+        return coroutine
     
     return asyncio.run(coroutine)
 

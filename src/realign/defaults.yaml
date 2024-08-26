@@ -19,7 +19,35 @@ llm_agents:
     hyperparams:
       temperature: 0
 
+  choice_judge_agent: &choice_judge_agent
+    model: openai/gpt-4o-mini
+    template: |
+      Based on the given criteria and {{ choices | length }} choices, rank them in order, starting with the choice that fits the criteria best, and ending the choice that fits the criteria worst. 
+      
+      Finally, respond in JSON format {"best_choice": "2", "worst_choice": "1"} with your best and worst choices. For example, if the choice 3 is the best choice and choice 5 is the worst, respond {"best_choice": "3", "worst_choice": "5"}.
+
+      [Criteria]
+      {{ criteria }}
+
+      {% for choice in choices %}
+          [Choice {{ loop.index }}]<br>
+          {{ choice }}<br>
+      {% endfor %}
+
+      [Selection]
+    json_mode: on
+    hyperparams:
+      temperature: 0
+
 evaluators:
+
+  elo_ratings:
+    initial_rating: 1500
+    k_factor: 32
+
+  allm_choice_judge:
+    batch_size: 2
+    agent_settings: *choice_judge_agent
 
   llm_rating_json:
     repeat: 3

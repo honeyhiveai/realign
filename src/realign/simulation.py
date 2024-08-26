@@ -11,6 +11,7 @@ from realign.datasets import Dataset, ChatDataset
 from realign.llm_utils import (
     router, 
     State,
+    OpenAIMessage,
     RunData,
     system_prompt_str, 
     str_msgs, 
@@ -39,6 +40,22 @@ class Context:
     
     run_data: Optional[RunData] = None
     eval_results: list[EvalResult] = field(default_factory=list)
+
+    def __getitem__(self, key: str | Any):
+        if not isinstance(key, str):
+            raise TypeError(f"Context keys must be strings, not {type(key)}")
+        if not key.isidentifier():
+            raise ValueError(f"Context key {key} is not a valid variable name")
+        if not hasattr(self, key):
+            raise KeyError(f"Context does not have attribute {key}")
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value: Any):
+        if not isinstance(key, str):
+            raise TypeError(f"Context keys must be strings, not {type(key)}")
+        if not key.isidentifier():
+            raise ValueError(f"Context key {key} is not a valid variable name")
+        setattr(self, key, value)
 
 class Simulation:
     
@@ -148,6 +165,10 @@ class Simulation:
             await asyncio.gather(*simulation_run_tasks)
             
             # windup
+            self.final_states = [
+                run_context.final_state
+                for run_context in self.run_contexts
+            ]
             await self.windup()
 
         finally:
@@ -160,9 +181,10 @@ class Simulation:
             # end timer
             end = asyncio.get_event_loop().time()
             
-            for run_id in range(self.runs):
-                print_run_id(run_id)
-                self.print_evals(self.run_contexts[run_id])
+            if self.evaluators and len(self.evaluators) > 0:
+                for run_id in range(self.runs):
+                    print_run_id(run_id)
+                    self.print_evals(self.run_contexts[run_id])
 
             print('\n\n' + '-'*100)
             print('Simulation Stats:')
@@ -247,18 +269,41 @@ class Simulation:
         with open(evaluations_path, 'w') as f:
             json.dump(self.export_eval_results(), f, indent=4)
 
-
 class ChatSimulation(Simulation):
-    '''Responsible for simulating, maintaining, processing states'''
-
-    def __init__(self, max_messages: int = 5, first_turn_role: str = 'user'):
+    def __init__(self, *args, max_messages: int = 5, first_turn_role: str = 'user', **kwargs):
         
         self.max_messages = max_messages
         self.first_turn_role = first_turn_role
 
-        super().__init__()
+        super().__init__(*args, **kwargs)
+    
+    def export_run_data(self) -> dict:
+        return_obj = {'inputs': [], 'outputs': [], 'ground_truths': [], 'metadata': []}        
+        for run_id, run_data in self.run_data.items():
+            state: State | list | None = run_data.final_state
+            if state:
+                if isinstance(state, State):
+                    return_obj['outputs'].append({'messages': [m.__dict__() for m in state.messages]})
+                elif isinstance(state, list) and all(isinstance(s, OpenAIMessage) for s in state):
+                    return_obj['outputs'].append({'messages': [m.__dict__() for m in state]})
+                else:
+                    return_obj['outputs'].append({'messages': '<invalid output>'})
+                
+                return_obj['metadata'].append({'run_id': run_id, 'run_data_hash': run_data.compute_hash()})
+        return return_obj
 
-    async def setup(self, runs: int = 3):
+
+class OldChatSimulation(Simulation):
+    '''Responsible for simulating, maintaining, processing states'''
+
+    def __init__(self, *args, max_messages: int = 5, first_turn_role: str = 'user', **kwargs):
+        
+        self.max_messages = max_messages
+        self.first_turn_role = first_turn_role
+
+        super().__init__(*args, **kwargs)
+
+    async def setup(self, *args, **kwargs):
         await super().setup()
         
         # simulation components
@@ -267,7 +312,7 @@ class ChatSimulation(Simulation):
                         .as_a('someone who wants help') \
                         .they_want_to('ask a question') \
                         .with_app_objective('answer a question') \
-                        .abuild_many(runs)
+                        .abuild_many(self.runs)
     
     async def main(self, run_context: Context) -> State:
         '''Simulates a chat conversation between the app and a synthetic user agent'''
@@ -309,8 +354,14 @@ class ChatSimulation(Simulation):
     def export_run_data(self) -> dict:
         return_obj = {'inputs': [], 'outputs': [], 'ground_truths': [], 'metadata': []}        
         for run_id, run_data in self.run_data.items():
-            state: State | None = run_data.final_state
+            state: State | list | None = run_data.final_state
             if state:
-                return_obj['outputs'].append({'messages': [m.__dict__() for m in state.messages]})
+                if isinstance(state, State):
+                    return_obj['outputs'].append({'messages': [m.__dict__() for m in state.messages]})
+                elif isinstance(state, list) and all(isinstance(s, OpenAIMessage) for s in state):
+                    return_obj['outputs'].append({'messages': [m.__dict__() for m in state]})
+                else:
+                    return_obj['outputs'].append({'messages': '<invalid output>'})
+                
                 return_obj['metadata'].append({'run_id': run_id, 'run_data_hash': run_data.compute_hash()})
         return return_obj

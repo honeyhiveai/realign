@@ -197,6 +197,8 @@ class AgentSettings:
         self.template_params = template_params
         return self
 
+def print_system_prompt(prompt, role='assistant'):
+    print(system_prompt_str(AgentSettings(system_prompt=prompt, role=role, model='')))
 
 def system_prompt_str(agent_settings: AgentSettings):
     """Returns the system prompt for the given agent settings"""
@@ -221,9 +223,17 @@ def system_prompt_str(agent_settings: AgentSettings):
     return string
 
 
-def str_msgs(messages: list[OpenAIMessage]):
+def str_msgs(messages: list[OpenAIMessage] | OpenAIMessage):
     string = ""
-    for m in messages:
+    
+    if isinstance(messages, OpenAIMessage):
+        msgs_list = [messages]
+    elif not messages or len(messages) == 0:
+        return 'no messages found'
+    else:
+        msgs_list = messages
+    
+    for m in msgs_list:
         if m.role == "user":
             string += "\n" + " ".join(
                 (bcolors.OKBLUE + "\n", m.role.upper(), "\n\n", m.content, bcolors.ENDC)
@@ -390,9 +400,11 @@ def llm_call_post_process_response(
             return OpenAIMessage(role="assistant", content="error")
 
     raw_message = response.choices[0].message
+    response_messages_role = agent_settings.role or raw_message["role"]
     response_message = OpenAIMessage(
-        role=raw_message["role"], content=raw_message["content"]
+        role=response_messages_role, content=raw_message["content"]
     )
+
     if agent_settings.json_mode:
         response_message.content = json.loads(response_message.content)
 

@@ -60,7 +60,16 @@ class ChatAgent(AbstractAgent):
         return state
     
     def process_turn(self, state: State = State()) -> list[OpenAIMessage]:
-        return asyncio.run(self.aprocess_turn(state))
+        '''Process a turn in the conversation'''
+        
+        new_message: OpenAIMessage = llm_messages_call(agent_settings=self.agent_settings, messages=state.messages)
+
+        new_message.role = self.agent_settings.role
+        
+        state.messages.append(new_message)
+        
+        # return the updated state
+        return state
 
 class AgentBuilder:
     
