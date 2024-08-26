@@ -18,4 +18,3 @@ llm_agents:
       app: *app_objective
       persona: math major at Columbia University
       scenario: wants to learn about clustering
-

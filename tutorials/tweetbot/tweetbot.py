@@ -1,10 +1,4 @@
-
-
-from realign.llm_utils import allm_messages_call, run_async
-from realign.evaluators import evaluator, aevaluator
-
-import realign
-realign.config.path = 'config.yaml'
+from realign import evaluator, allm_messages_call, run_async
 
 @evaluator
 def tweet_char_count(text: str) -> int:

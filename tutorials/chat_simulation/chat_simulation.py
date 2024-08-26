@@ -1,13 +1,10 @@
-from realign.simulation import ChatSimulation, Context
 from realign.llm_utils import (
-    allm_messages_call, 
     str_msgs, 
     print_run_id, 
     print_system_prompt
 )
 
-import realign
-realign.config.path = 'config.yaml'
+from realign import allm_messages_call, ChatSimulation, Context
 
 class TutorSimulation(ChatSimulation):
     
@@ -70,4 +67,4 @@ class TutorSimulation(ChatSimulation):
         return messages
 
 sim = TutorSimulation()
-sim.run(3)
+sim.run(1)

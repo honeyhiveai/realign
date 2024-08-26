@@ -30,8 +30,8 @@ llm_agents:
       {{ criteria }}
 
       {% for choice in choices %}
-          [Choice {{ loop.index }}]<br>
-          {{ choice }}<br>
+          [Choice {{ loop.index }}]
+          {{ choice }}
       {% endfor %}
 
       [Selection]

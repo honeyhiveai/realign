@@ -2,7 +2,7 @@ import numpy as np
 import itertools
 
 from realign.evaluators import aevaluator, evaluator
-from realign.llm_utils import allm_messages_call
+from realign.llm_utils import allm_messages_call, AgentSettings
 from realign.utils import run_async
 
 
@@ -54,8 +54,8 @@ async def allm_choice_judge(
             best_choice = int(message.content['best_choice']) - 1
             worst_choice = int(message.content['worst_choice']) - 1
             
-            assert 0 <= best_choice < len(choices)
-            assert 0 <= worst_choice < len(choices)
+            assert 0 <= best_choice < len(choices), f"Best choice {best_choice} out of range"
+            assert 0 <= worst_choice < len(choices), f"Worst choice {worst_choice} out of range"
             
             # Generate pairwise comparisons
             all_preferences = [

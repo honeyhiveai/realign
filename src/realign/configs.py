@@ -14,46 +14,46 @@ config_path = DEFAULT_CONFIG_PATH
 
 
 class Config:
-    def __init__(self):
-        self._config_path = DEFAULT_CONFIG_PATH
+
+    _config_path = DEFAULT_CONFIG_PATH
+    config_content = dict()
 
     def __set__(self, _, path):
         
         # get the path of the caller of this function using inspect
         caller_path = inspect.stack()[1].filename
-        
-        dir_path = os.path.join(os.path.dirname(caller_path), 'config.yaml')
+        dir_path = os.path.join(os.path.dirname(caller_path), path)
 
         if os.path.exists(path):
             path = path
         elif os.path.exists(dir_path):
             path = dir_path
         else:
-            raise FileNotFoundError(f"Config file not found at {path} or {dir_path}.")
+            raise FileNotFoundError(f"Config file {path} or {dir_path} not found.")
 
         # if path unchanged, return
-        # if self._config_path == path:
+        # if Config._config_path == path:
         #     return
 
         # check if valid yaml
-        config_content = None
+        Config.config_content = dict()
         with open(path) as f:
             try:
-                config_content = yaml.safe_load(f)
+                Config.config_content = yaml.safe_load(f)
             except yaml.YAMLError as exc:
                 print(exc)
                 raise
 
-            if not ("llm_agents" in config_content or "evaluators" in config_content):
+            if not ("llm_agents" in Config.config_content or "evaluators" in Config.config_content):
                 raise ValueError(
                     f"Invalid YAML structure. Expected 'llm_agents' or 'evaluators' keys at the root level."
                 )
 
-        self._config_path = path
+        Config._config_path = path
         self.load_config()
 
     def __get__(self, obj, objtype):
-        return self._config_path
+        return Config._config_path
 
     def __call__(self):
         self.load_config()
@@ -77,7 +77,7 @@ class Config:
         from realign.evaluators import evaluator, aevaluator, get_eval_settings
 
         config_eval_settings, config_eval_kwargs = get_eval_settings(
-            yaml_file=self._config_path
+            yaml_file=Config._config_path
         )
         
         '''
@@ -156,6 +156,8 @@ class Config:
 class ConfigPath:
     path = Config()
 
+    def __getitem__(self, key):
+        return Config.config_content[key]
 
 config = ConfigPath()
 

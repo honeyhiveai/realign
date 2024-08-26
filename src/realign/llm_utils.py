@@ -42,7 +42,14 @@ class OpenAIMessage:
 
     def __dict__(self):
         return {"role": str(self.role), "content": str(self.content)}
-    
+
+    def __eq__(self, other):
+        if isinstance(other, dict):
+            other = OpenAIMessage(**other)
+        elif not isinstance(other, OpenAIMessage):
+            return False
+        
+        return self.role == other.role and self.content == other.content
 
 
 @dataclass
@@ -114,6 +121,10 @@ class AgentSettings:
 
     # user or assistant
     role: str = "assistant"
+    
+    # initialize the messages
+    # system messages will be ignored, since they must be defined in the template / system_prompt
+    init_messages: Optional[list[OpenAIMessage]] = None
 
     def resolve_response_format(self) -> str:
         if self.json_mode:
@@ -144,12 +155,10 @@ class AgentSettings:
         elif not all([type(k) == str for k in template_params.keys()]):
             raise ValueError("Prompt params keys must be strings")
 
-        # ensure that values are all strings
-        for k, v in template_params.items():
+        # ensure that keys are all strings
+        for k in template_params.keys():
             if type(k) != str:
                 raise ValueError("Prompt params keys must be strings")
-            if type(v) != str:
-                template_params[k] = str(v)
 
         # try to render the template
         try:
@@ -343,12 +352,31 @@ def llm_call_get_completion_params(
     # validate the keys
     agent_settings.validate_keys()
 
+    # insert / prepend / replace the system prompt
     if len(messages) == 0:
         messages = [OpenAIMessage(role="system", content=system_prompt)]
     elif messages[0].role != "system":
         messages.insert(0, OpenAIMessage(role="system", content=system_prompt))
     else:
         messages[0].content = system_prompt
+        
+    assert len(messages) > 0 and messages[0].role == "system", 'could not initialize messages'
+        
+    # add the init_messages only once at the beginning
+    if agent_settings.init_messages:
+        for i, m in enumerate(agent_settings.init_messages):
+            if type(m) == dict:
+                msg = OpenAIMessage(**m)
+            elif type(m) == OpenAIMessage:
+                msg = m
+            else:
+                raise ValueError(f"Invalid init_message type: {type(m)}")
+            
+            if msg.role != "system":
+                # assume that if the exact same messages are present already at the same positions,
+                # we don't need to add them again
+                if messages[i + 1] != msg:
+                    messages.insert(i + 1, msg)
 
     # swap roles for user
     if agent_settings.role == "user":
@@ -466,7 +494,6 @@ async def allm_messages_call(
         agent_name=agent_name,
         **agent_settings_kwargs,
     )
-    
 
     # get the params
     params = llm_call_get_completion_params(agent_settings, messages)
@@ -480,7 +507,6 @@ async def allm_messages_call(
     )
 
     return message
-
 
 
 async def aembed_text(text: str, **kwargs):
