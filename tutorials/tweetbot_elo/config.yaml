@@ -11,9 +11,15 @@ llm_agents:
 
       Here is the user request: I want to {{ user_request }}
 
-      Keep your prompt SHORT with no more than 5 bullet points.
+      Here is the abstract of the paper: {{ paper_abstract }}
+
+      Keep your prompt SHORT.
 
       Respond ONLY with the final instruction and NOTHING else in your response.
+    template_params:
+      paper_abstract: |
+        Abstract: This paper, titled 'LLM experiments with simulation: Large Language Model Multi-Agent System for Simulation Model Parametrization in Digital Twins', presents a novel design of a multi-agent system framework that applies large language models (LLMs) to automate the parametrization of simulation models in digital twins. This framework features specialized LLM agents tasked with observing, reasoning, decision-making, and summarizing, enabling them to dynamically interact with digital twin simulations to explore parametrization possibilities and determine feasible parameter settings to achieve an objective. The proposed approach enhances the usability of simulation model by infusing it with knowledge heuristics from LLM and enables autonomous search for feasible parametrization to solve a user task. Furthermore, the system has the potential to increase user-friendliness and reduce the cognitive load on human users by assisting in complex decision-making processes.
+
 
   content_agent: &content_agent
     model: openai/gpt-4o-mini
@@ -34,6 +40,8 @@ llm_agents:
       Don't make general claims
       Don't start with a question
 
+      At the end of the post, make one single thought-provoking claim. Do NOT make more than one claim.
+
       Please respond with the post only and no other text before or after it.
 
       Here is an example of a good response in the right style:
@@ -48,7 +56,9 @@ llm_agents:
     template_params:
       platform: Twitter
       platform_instructions: |
-        Make sure the tweet is long. Make sure you have an interesting perspective about the topic, don't just summarize.
+        Make sure the tweet is long. 
+        Make sure you have an interesting perspective about the topic, don't just summarize.
+        Try to be creative, but make sure you are always being truthful.
       example: |
         Mixture-of-Agents as an Event-Driven System 🤖☎️
         This paper by @JunlinWang3 shows you how to ensemble smaller LLMs to create a system that can outperform state-of-the-art larger models.
@@ -58,9 +68,6 @@ llm_agents:
 
         ✅ Take full advantage of processing an entire batch of requests
         ✅ Cleaner, readable code
-
-        LlamaPack: https://llamahub.ai/l/llama-packs/llama-index-packs-mixture-of-agents?from=
-        Learn more about workflows: https://llamaindex.ai/blog/introducing-workflows-beta-a-new-way-to-create-complex-ai-applications-with-llamaindex
 
   linkedin_content_agent:
     << : *content_agent
@@ -97,11 +104,15 @@ evaluators:
   llm_tweet_choice_judge:
     wraps: allm_choice_judge
     criteria: |
-      1. Make sure sentences are concise and don't use flowery language.
-      2. It shouldn't sound too salesy or promotional.
-      3. Don't use too many adjectives or adverbs.
-      4. Don't make general claims.
-      5. Don't start with a question.
+      - Make sure sentences are concise and don't use flowery language.
+      - It should say something interesting to an AI developer.
+      - It should make a profound and true claim about AI.
+      - It shouldn't sound too salesy or promotional.
+      - It should be factually accurate.
+      - It should be grammatically correct.
+      - Don't use too many adjectives or adverbs.
+      - Don't make general claims.
+      - Don't start with a question.
 
     aggregate: elo_ratings(values)
 

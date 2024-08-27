@@ -17,7 +17,7 @@ Realign is a tool to test and evaluate your LLM agents blazing fast. We'll provi
 Let's start by creating a simple Twitter (X?) bot:
 
 ```python
-from realign.llm_utils import llm_messages_call
+from realign import llm_messages_call
 
 def tweetbot(prompt: str) -> str:
 
@@ -75,7 +75,7 @@ Now let's assume you want to create 10 tweets and see which one looks best.
 You could do this by calling `llm_messages_call` 10 times. However, this would be slow. Let's try it:
 
 ```python
-from realign.llm_utils import llm_messages_call
+from realign import llm_messages_call
 import time
 
 
@@ -132,7 +132,7 @@ Total time: 15.58 seconds
 It takes about 15 seconds because the API calls happen sequentially. To run these API calls in parallel, you can use the `allm_messages_call` method and `run_async` utility.
 
 ```python
-from realign.llm_utils import allm_messages_call, run_async
+from realign import allm_messages_call, run_async
 import time
 
 
@@ -208,7 +208,7 @@ Here's a summary of the main changes compared to the synchronous run:
 You might want the Tweet to follow certain rules and patterns. To do this, we can use a prompt template:
 
 ```python
-from realign.llm_utils import allm_messages_call, run_async
+from realign import allm_messages_call, run_async
 
 async def tweet(prompt, i):
 
@@ -310,14 +310,8 @@ Some notes on the YAML file:
 
 - The `template` field is a Jinja template (string with double curly braces for variables, like `{{var}}`). The template is rendered using a Python dictionary which maps the variable key string with the rendered string for that variable name. This is passed into `allm_messages_call` using the `template_param` field.
 
-You can find the full specification for the YAML config [here](#TODO).
+You can find the full specification for the YAML config [here](./CONCEPTS.md#agents).
 
-We can import the config by setting the global path in our code:
-
-```python
-import realign
-realign.config_path = 'tutorials/tweetbot/config.yaml'
-```
 
 We can use this agent in our code by modifying the `allm_messages_call` params:
 
@@ -381,6 +375,10 @@ There are a few ways to implement Evaluators:
 - Local Model Evaluator: these use a model on your local device
 
 - LLM Evaluator: these use an LLM to generate a score for your application
+
+
+> In Realign, *ANY* Python function can become an evaluator if it is decorated with **@evaluator** (or **@aevaluator** if function is async). A Realign evaluator's kwargs, repeat, targets and other stateless settings can be configured in the YAML file using the funciton name as the key. 
+
 
 Let's build 4 evaluators:
 
@@ -465,7 +463,7 @@ Similar to the last example, we can use Huggingface pipelines:
 from transformers import pipeline
 import torch
 
-def hate_speech_detection(tweet_text):
+def sentiment_detection(tweet_text):
     # Evaluation = assert that score(output) within target range
     # score = positive / neutral / negative
     # target = [positive, neutral]
@@ -494,7 +492,12 @@ def hate_speech_detection(tweet_text):
 
 Feeling icky with all the code duplication? In Realign, we can pull out all the static / stateless settings into the config file. This helps you cleanly manage your evaluators. Moreover, Realign provides in-built configurations and evaluators.
 
-#### Using Realign Evaluators
+&nbsp;
+&nbsp;
+&nbsp;
+
+
+### Using Realign Evaluators
 
 In Realign, any Python function can be converted to an Evaluator using the `@evaluator` decorator. If your function is async, you can use the `@aevaluator` decorator. 
 
@@ -610,7 +613,7 @@ evaluators:
 
 LLMs have great language and reasoning skills, and so we can use them to evaluate the responses of another LLM.
 
-We can use Realign's `llm_rating_json` evaluator, which is already implemented for you. You can check out its configuration [here](#TODO). TL;DR: it uses the criteria to evaluate the messages, repeats it 3 times and aggregates the scores and explanations. 
+We can use Realign's `llm_rating_json` evaluator, which is already implemented for you. You can check out its configuration [here](../src/realign/defaults.yaml) and implementation [here](../src/realign/evallib/llm.py). TL;DR: it uses the criteria to evaluate the messages, repeats it 3 times and aggregates the scores and explanations. 
 
 ```yaml
 tweet_judge:

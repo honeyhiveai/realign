@@ -127,7 +127,12 @@ class Simulation:
             self.eval_results[run_id] = self.run_contexts[run_id].eval_results
             
         self.push_runs_to_dataset()
-        self.push_evals_dataset()     
+        self.push_evals_dataset()
+        
+        # print the results for each run
+        for run_id in range(self.runs):
+            print_run_id(run_id)
+            print(self.run_data[run_id].final_state, '\n\n')
     
     async def run_concurrently(self, run_context: Context):
         

@@ -32,7 +32,8 @@ async def allm_choice_judge(
     # all batches of non-similar choices
     comparison_idxs = list(itertools.permutations(list(range(len(choices))), batch_size))
     
-    print('Comparisons: ', comparison_idxs)
+    print(f'Running Np2 = {len(choices)}p{batch_size} = {len(comparison_idxs)} comparisons concurrently')
+    print(comparison_idxs)
     
     comparison_tasks = []
     
@@ -73,7 +74,7 @@ async def allm_choice_judge(
         comparison_tasks.append(batch_compare_task())
     
     all_batch_results = await run_async(comparison_tasks)
-    print('Ran', len(all_batch_results), 'comparisons')
+    print('Ran', len(all_batch_results), 'comparisons concurrently')
     
     # flatten the rankings
     pairs = [

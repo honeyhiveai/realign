@@ -25,14 +25,19 @@ The highest rated tweet is the overall winner, and the lowest rated tweet the ov
 
 
 ```yaml
-llm_tweet_choice_judge:
+evaluators:
+  llm_tweet_choice_judge:
     wraps: allm_choice_judge
     criteria: |
-        1. Make sure sentences are concise and don't use flowery language.
-        2. It shouldn't sound too salesy or promotional.
-        3. Don't use too many adjectives or adverbs.
-        4. Don't make general claims.
-        5. Don't start with a question.
+      - Make sure sentences are concise and don't use flowery language.
+      - It should say something interesting to an AI developer.
+      - It should make a profound and true claim about AI.
+      - It shouldn't sound too salesy or promotional.
+      - It should be factually accurate.
+      - It should be grammatically correct.
+      - Don't use too many adjectives or adverbs.
+      - Don't make general claims.
+      - Don't start with a question.
 
     aggregate: elo_ratings(values)
 ```
