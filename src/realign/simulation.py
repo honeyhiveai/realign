@@ -145,7 +145,7 @@ class Simulation:
 
         # initialize auto tracer
         if not self.disable_auto_tracing and self.tracer:
-            self.tracer.initalize_trace_for_simulation( run_context )
+            self.tracer.initialize_trace_for_simulation( run_context )
         
         # before_each
         await self.before_each(run_context)

@@ -95,7 +95,7 @@ class Evaluation(Simulation):
             if evaluation_output:
                 tracing_metadata["outputs"] = evaluation_output
 
-            tracer.add_trace_metadata(tracing_metadata)
+            tracer.enrich_trace(tracing_metadata)
         except Exception as e:
             print(f"Error adding trace metadata: {e}")
 
