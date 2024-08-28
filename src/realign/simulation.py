@@ -77,8 +77,8 @@ class Simulation:
         self.eval_results: dict[int, list[EvalResult]] = dict()
 
         # tracing
-        self.instrument_manual_tracing = False # set this value to True to bypass auto tracing
-        if self.instrument_manual_tracing:
+        self.disable_auto_tracing = False # set this value to True to bypass auto tracing
+        if self.disable_auto_tracing:
             self.tracer = None
         else:
             self.tracer = get_tracer('simulation')
@@ -144,7 +144,7 @@ class Simulation:
     async def run_concurrently(self, run_context: Context):
 
         # initialize auto tracer
-        if not self.instrument_manual_tracing and self.tracer:
+        if not self.disable_auto_tracing and self.tracer:
             self.tracer.initalize_trace_for_simulation( run_context )
         
         # before_each
