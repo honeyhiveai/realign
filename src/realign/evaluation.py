@@ -1,118 +1,145 @@
 
-from realign.simulation import Simulation
-from realign.llm_utils import allm_messages_call, llm_messages_call
-from realign.tracing import get_tracer
+from typing import Optional, List, Dict, Any
 
 import honeyhive
-from honeyhive.models import components, operations
+from honeyhive.models import components
 from honeyhive.tracer import HoneyHiveTracer
-import os
-import realign
 
+import realign
+from realign.simulation import Simulation, Context, RunData
+from realign.tracing import TracingInterface
+from realign.tracing import get_tracer
 
 class Evaluation(Simulation):
+    ''' This class is for automated honeyhive evaluation with tracing '''
 
     def __init__(self, 
-                 evaluation_name, 
-                 dataset_id = None, 
-                 query_list = None):
+                 evaluation_name: str, 
+                 dataset_id: Optional[str] = None, 
+                 query_list: Optional[List[Dict[str, Any]]] = None):
         super().__init__()
-        self.hhai = honeyhive.HoneyHive(
-            bearer_auth=os.environ['HH_API_KEY'],
-        )
-        self.eval_name = evaluation_name
-        self.dataset_id = dataset_id
-        self.evaluation_session_ids = []
 
-        if self.dataset_id:
-            dataset = self.hhai.datasets.get_datasets(
-                project= os.environ['HH_PROJECT'],
-                dataset_id= dataset_id,
-            )
-            if dataset.object.testcases is not None and len(dataset.object.testcases) > 0:
-                self.dataset = dataset.object.testcases[0]
-                print(self.dataset.datapoints)
-            else:
-                raise RuntimeError("No dataset found with id - {} for project - {}".format(id, os.environ['HH_PROJECT'])) 
-            self.runs = len(self.dataset.datapoints)
-        else:
-            self.dataset = None
+        self._validate_requirements()
+
+        self.hhai = honeyhive.HoneyHive(bearer_auth=realign.tracing.honeyhive_key)
+        self.eval_name: str = evaluation_name
+        self.dataset_id: str = dataset_id
+        self.evaluation_session_ids: List[str] = []
+        self.eval_run: Optional[components.CreateRunResponse] = None
+
+        self.dataset = self._load_dataset()
         self.query_list = query_list
-        self.instrument_manual_tracing = True 
+        self.disable_auto_tracing = True
+        self.runs = len(self.dataset.datapoints) if self.dataset else len(query_list) if query_list else 0
 
+    def _validate_requirements(self) -> None:
+        ''' Sanity check of requirements for HoneyHive evaluations and tracing. '''
+        if not hasattr(realign.tracing, 'honeyhive_key'):
+            raise Exception("Honeyhive API key not found. Please set 'realign.tracing.honeyhive_key' to initiate Honeyhive Tracer. Cannot run Evaluation")
+        if not hasattr(realign.tracing, 'honeyhive_project'):
+            raise Exception("Honeyhive Project not found. Please set 'realign.tracing.honeyhive_project' to initiate Honeyhive Tracer. Cannot run Evaluation")
 
-    async def setup(self):
+    def _load_dataset(self) -> Optional[Any]:
+        ''' Private function to acquire Honeyhive dataset based on dataset_id. '''
+        if not self.dataset_id:
+            return None
+        try:
+            dataset = self.hhai.datasets.get_datasets(
+                project=realign.tracing.honeyhive_project,
+                dataset_id=self.dataset_id,
+            )
+            if dataset and dataset.object.testcases and len(dataset.object.testcases) > 0:
+                return dataset.object.testcases[0]
+        except Exception:
+            raise RuntimeError(f"No dataset found with id - {self.dataset_id} for project - {realign.tracing.honeyhive_project}")
 
-        eval_run = self.hhai.runs.create_run(request=components.CreateRunRequest(
-            project=os.environ['HH_PROJECT'],
-            name=self.eval_name,
-            dataset_id=self.dataset_id,
-            event_ids=[],
-        ))
-        self.eval_run = eval_run.create_run_response
-        
-
-    async def main(self, run_context) -> None:
-
-        inputs = None
-        run_unique_iterator = run_context.run_id
-
+    def _get_inputs(self, run_id: int) -> Optional[Dict[str, Any]]:
+        ''' Private function to process and iterate over HoneyHive datapoints from Honeyhive dataset '''
         if self.dataset and self.dataset.datapoints and len(self.dataset.datapoints) > 0 :
             try:
-                datapoint_id = self.dataset.datapoints[run_unique_iterator]
-                datapoint_response = self.hhai.datapoints.get_datapoint(id = datapoint_id)
-                datapoint = datapoint_response.object.datapoint[0]
-                inputs = datapoint.inputs
-                
+                datapoint_id = self.dataset.datapoints[run_id]
+                datapoint_response = self.hhai.datapoints.get_datapoint(id=datapoint_id)
+                return datapoint_response.object.datapoint[0].inputs
             except Exception as e:
-                print(e)
-            
-            
+                print(f"Error getting datapoint: {e}")
         elif self.query_list:
-            inputs = self.query_list[run_unique_iterator]
+            return self.query_list[run_id]
+        return None
 
+    def _initialize_tracer(self):
+        ''' Private function to instrument Honeyhive Tracer. '''
         tracer = get_tracer('evaluation')
         if not tracer:
-            raise Exception(f"Unable to initiate Honeyhive Tracer. Cannot run Evaluation")
-        
+            raise Exception("Unable to initiate Honeyhive Tracer. Cannot run Evaluation")
         tracer.initialize_trace(self.eval_name)
+        return tracer
 
-        evaluation_output = None
+    async def _run_evaluation(self, inputs: Optional[Dict[str, Any]]) -> Optional[Any]:
+        ''' Private function to safely execute the evaluating function '''
         try:
-            evaluation_output = await self.eval_function(inputs)
+            return await self.eval_function(inputs)
         except Exception as error:
-            print(error)
-            pass
+            print(f"Error in evaluation function: {error}")
+            return None
 
+    def _add_trace_metadata(self, tracer: TracingInterface, inputs: Optional[Dict[str, Any]], evaluation_output: Optional[Any], run_id: int):
+        ''' Private function to enrich the session data post flow completion. '''
         try:
-            tracing_metadata = { 
+            tracing_metadata = {
                 "run_id": self.eval_run.run_id,
-                "inputs": inputs 
+                "inputs": inputs
             }
-            if datapoint:
-                tracing_metadata["datapoint_id"] = datapoint_id
+            if self.dataset:
+                tracing_metadata["datapoint_id"] = self.dataset.datapoints[run_id]
                 tracing_metadata["dataset_id"] = self.dataset_id
             if evaluation_output:
                 tracing_metadata["outputs"] = evaluation_output
 
             tracer.add_trace_metadata(tracing_metadata)
         except Exception as e:
-            print(e)
+            print(f"Error adding trace metadata: {e}")
+
+    async def setup(self, *args, **kwargs):
+        ''' Custom instrumentation for inherited function. Initiate an evaluation run in Honeyhive.'''
+        eval_run = self.hhai.runs.create_run(request=components.CreateRunRequest(
+            project=realign.tracing.honeyhive_project,
+            name=self.eval_name,
+            dataset_id=self.dataset_id,
+            event_ids=[],
+        ))
+        self.eval_run = eval_run.create_run_response
+
+    async def main(self, run_context: Context) -> Optional[RunData]:
+        ''' Custom instrumentation for inherited function. Orchestrate the HoneyHive evaluation flow.'''
+        inputs = self._get_inputs(run_context.run_id)
+        tracer = self._initialize_tracer()
+
+        evaluation_output = await self._run_evaluation(inputs)
+        self._add_trace_metadata(tracer, inputs, evaluation_output, run_context.run_id)
         self.evaluation_session_ids.append(HoneyHiveTracer.session_id)
 
-        return 
-    
-    async def windup(self):
-        self.hhai.runs.update_run(
-            run_id = self.eval_run.run_id,
-            update_run_request=components.UpdateRunRequest(
-                event_ids = self.evaluation_session_ids,
-                status = "completed"
-            )
-        )
-        return await super().windup()
+        return None
 
-    
-    async def eval_function(self, inputs_json):
-        pass
-    
+    async def windup(self):
+        ''' Custom instrumentation for inherited function. Orchestrate the HoneyHive evaluation flow.'''
+        try:
+            if self.eval_run:
+                self.hhai.runs.update_run(
+                    run_id=self.eval_run.run_id,
+                    update_run_request=components.UpdateRunRequest(
+                        event_ids=self.evaluation_session_ids,
+                        status="completed"
+                    )
+                )
+        except Exception:
+            print("Warning: Unable to mark evaluation as `Completed`")
+        await super().windup()
+
+    async def eval_function(self, inputs: Optional[Dict[str, Any]]) -> Any:
+        ''' Function to be instrumented for evaluation. 
+        The evaluation flow can be plugged into this function. 
+
+        It takes the following parameter: 
+        - inputs -> this refers to the json with keys mapped to yaml variables'''
+
+        raise NotImplementedError("Subclasses must implement eval_function")
