@@ -26,7 +26,7 @@ from realign.agents import (
 )
 from realign.evaluators import evaluator, EvalResult
 from realign.utils import arun_callables, bcolors
-
+from realign.tracing import get_tracer
 
 @dataclass
 class Context:
@@ -75,6 +75,13 @@ class Simulation:
         # results
         self.run_data: dict[int, RunData] = dict()
         self.eval_results: dict[int, list[EvalResult]] = dict()
+
+        # tracing
+        self.instrument_manual_tracing = False # set this value to True to bypass auto tracing
+        if self.instrument_manual_tracing:
+            self.tracer = None
+        else:
+            self.tracer = get_tracer('simulation')
 
     async def setup(self, *args, **kwargs):
         '''Sets up objects used in the simulation'''
@@ -135,6 +142,10 @@ class Simulation:
             print(self.run_data[run_id].final_state, '\n\n')
     
     async def run_concurrently(self, run_context: Context):
+
+        # initialize auto tracer
+        if not self.instrument_manual_tracing and self.tracer:
+            self.tracer.initalize_trace_for_simulation( run_context )
         
         # before_each
         await self.before_each(run_context)
