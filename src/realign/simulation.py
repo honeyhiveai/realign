@@ -40,6 +40,14 @@ class Context:
     
     run_data: Optional[RunData] = None
     eval_results: list[EvalResult] = field(default_factory=list)
+    
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Allow setting arbitrary attributes."""
+        super().__setattr__(name, value)
+    
+    def __getattr__(self, name: str) -> Any:
+        """Handle access to non-existent attributes."""
+        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
 
     def __getitem__(self, key: str | Any):
         if not isinstance(key, str):
@@ -56,6 +64,20 @@ class Context:
         if not key.isidentifier():
             raise ValueError(f"Context key {key} is not a valid variable name")
         setattr(self, key, value)
+        
+    def __str__(self):
+        attributes = []
+        for attr, value in self.__dict__.items():
+            if attr.startswith('_'):  # Skip private attributes
+                continue
+            if isinstance(value, (int, float, str, bool, type(None))):
+                attributes.append(f"{attr}={value!r}")
+            else:
+                attributes.append(f"{attr}={type(value).__name__}")
+        return f"Context({', '.join(attributes)})"
+
+    def __repr__(self):
+        return self.__str__()
 
 class Simulation:
     
@@ -82,8 +104,8 @@ class Simulation:
             self.tracer = None
         else:
             self.tracer = get_tracer('simulation')
-
-    async def setup(self, *args, **kwargs):
+            
+    async def _setup(self, *args, **kwargs):
         '''Sets up objects used in the simulation'''
         
         # simulation components accessible to main
@@ -91,16 +113,37 @@ class Simulation:
         self.app: AbstractAgent = None
         self.evaluators: list[Callable | evaluator] = []
         
-    async def before_each(self, run_context: Context):
-        '''Runs asyncronously before each simulation run'''
-        return None
-    
-    async def main(self, run_context: Context) -> RunData:
-        print('Running empty main! Please override.')
-    
-    async def after_each(self, run_context: Context):
-        '''Runs synchronously after each simulation run'''
+        result = await self.setup(*args, **kwargs)
         
+        ### other setup code
+        
+        return result
+
+    async def setup(self, *args, **kwargs): ...
+    
+    async def _before_each(self, run_context: Context):
+        # initialize auto tracer
+        if not self.disable_auto_tracing and self.tracer:
+            self.tracer.initialize_trace_for_simulation(run_context)
+                
+        result = await self.before_each(run_context)
+    
+        ### other before_each code
+        
+        return result
+        
+    async def before_each(self, run_context: Context): ...
+    
+    async def _main(self, run_context: Context) -> RunData:
+        result = await self.main(run_context)
+        
+        ### other main code
+        
+        return result
+    
+    async def main(self, run_context: Context) -> RunData: ...
+    
+    async def _after_each(self, run_context: Context):
         # run the evaluators
         if self.evaluators and len(self.evaluators) > 0:
             
@@ -120,14 +163,18 @@ class Simulation:
                 else:
                     # scores
                     run_context.eval_results[e] = eval_scores[e]
-            
         else:
             run_context.eval_results = []
+            
+        result = await self.after_each(run_context)
+        
+        ### other after_each code
+        
+        return result
     
-        
-    async def windup(self):
-        '''Runs synchronously after all simulation runs'''
-        
+    async def after_each(self, run_context: Context): ...
+    
+    async def _windup(self):
         # aggregate the results
         for run_id in range(self.runs):
             self.run_data[run_id] = self.run_contexts[run_id].run_data
@@ -140,23 +187,28 @@ class Simulation:
         for run_id in range(self.runs):
             print_run_id(run_id)
             print(self.run_data[run_id].final_state, '\n\n')
+
+        result = await self.windup()
+        
+        ### other windup code
+        
+        return result
+    
+    async def windup(self): ...
     
     async def run_concurrently(self, run_context: Context):
 
-        # initialize auto tracer
-        if not self.disable_auto_tracing and self.tracer:
-            self.tracer.initialize_trace_for_simulation( run_context )
-        
         # before_each
-        await self.before_each(run_context)
+        await self._before_each(run_context)
             
         # run the simulation main
-        run_context.final_state = await self.main(run_context)
+        run_context.final_state = await self._main(run_context)
+        
         run_context.run_data = RunData(run_context.final_state,
-                                          run_id=run_context.run_id)
+                                       run_id=run_context.run_id)
              
         # after_each
-        await self.after_each(run_context)
+        await self._after_each(run_context)
      
     async def run_simulation(self):
         
@@ -171,7 +223,7 @@ class Simulation:
             ]
             
             # setup
-            await self.setup(*self.sim_args, **self.sim_kwargs)
+            await self._setup(*self.sim_args, **self.sim_kwargs)
             
             # before_each, main, after_each
             simulation_run_tasks = [
@@ -185,7 +237,7 @@ class Simulation:
                 run_context.final_state
                 for run_context in self.run_contexts
             ]
-            await self.windup()
+            await self._windup()
 
         finally:
             if router:
