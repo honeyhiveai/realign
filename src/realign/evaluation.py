@@ -99,6 +99,20 @@ class Evaluation(Simulation):
         except Exception as e:
             print(f"Error adding trace metadata: {e}")
 
+    async def _before_each(self, run_context: Context):
+        ''' Private function to load inputs and initialize session for evaluation run. '''
+        run_context.inputs = self._get_inputs(run_context.run_id)
+        run_context.tracer = self._initialize_tracer()
+
+        return await super()._before_each(run_context)
+    
+    async def _after_each(self, run_context: Context):
+        ''' Private function to tag session and append to evaluation run. '''
+        self._add_trace_metadata(run_context.tracer, run_context.inputs, run_context.final_state, run_context.run_id)
+        self.evaluation_session_ids.append(HoneyHiveTracer.session_id)
+
+        return await super()._after_each(run_context)
+    
     async def setup(self, *args, **kwargs):
         ''' Custom instrumentation for inherited function. Initiate an evaluation run in Honeyhive.'''
         eval_run = self.hhai.runs.create_run(request=components.CreateRunRequest(
@@ -108,17 +122,6 @@ class Evaluation(Simulation):
             event_ids=[],
         ))
         self.eval_run = eval_run.create_run_response
-
-    async def main(self, run_context: Context) -> Optional[RunData]:
-        ''' Custom instrumentation for inherited function. Orchestrate the HoneyHive evaluation flow.'''
-        inputs = self._get_inputs(run_context.run_id)
-        tracer = self._initialize_tracer()
-
-        evaluation_output = await self._run_evaluation(inputs)
-        self._add_trace_metadata(tracer, inputs, evaluation_output, run_context.run_id)
-        self.evaluation_session_ids.append(HoneyHiveTracer.session_id)
-
-        return None
 
     async def windup(self):
         ''' Custom instrumentation for inherited function. Orchestrate the HoneyHive evaluation flow.'''
@@ -134,12 +137,3 @@ class Evaluation(Simulation):
         except Exception:
             print("Warning: Unable to mark evaluation as `Completed`")
         await super().windup()
-
-    async def eval_function(self, inputs: Optional[Dict[str, Any]]) -> Any:
-        ''' Function to be instrumented for evaluation. 
-        The evaluation flow can be plugged into this function. 
-
-        It takes the following parameter: 
-        - inputs -> this refers to the json with keys mapped to yaml variables'''
-
-        raise NotImplementedError("Subclasses must implement eval_function")
