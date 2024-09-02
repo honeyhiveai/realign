@@ -45,13 +45,13 @@ OPENAI_API_KEY="your_openai_key"
 
 Let's build an agent that produces content for your brand.
 
-> **Tweetbot**: generates N high quality tweets concurrently, evaluates them using Python code, HuggingFace classifiers, and LLM Judge (multiple runs, aggregated scores). 
+> **Tweetbot**: generates N high quality tweets concurrently, runs pairwise comparisons for the generated tweets using an LLM judge, aggregates comparisons using elo scores, and shows you the best and worst tweets. 
 
 Please download and run this code!
 
-### Code: [tweetbot.py](https://github.com/honeyhiveai/realign/blob/main/examples/tweetbot/tweetbot.py)
+### Code: [tweetbot.py](tutorials/tweetbot_elo/tweetbot_elo.py)
 
-### Config: [config.yaml](https://github.com/honeyhiveai/realign/blob/main/examples/tweetbot/config.yaml)
+### Config: [config.yaml](tutorials/tweetbot_elo/config.yaml)
 
 # [Tutorials](docs/TUTORIALS.md)
 

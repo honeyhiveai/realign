@@ -613,11 +613,11 @@ evaluators:
 
 LLMs have great language and reasoning skills, and so we can use them to evaluate the responses of another LLM.
 
-We can use Realign's `llm_rating_json` evaluator, which is already implemented for you. You can check out its configuration [here](../src/realign/defaults.yaml) and implementation [here](../src/realign/evallib/llm.py). TL;DR: it uses the criteria to evaluate the messages, repeats it 3 times and aggregates the scores and explanations. 
+We can use Realign's `allm_rating_json` evaluator, which is already implemented for you. You can check out its configuration [here](../src/realign/defaults.yaml) and implementation [here](../src/realign/evallib/llm.py). TL;DR: it uses the criteria to evaluate the messages, repeats it 3 times and aggregates the scores and explanations. 
 
 ```yaml
 tweet_judge:
-    wraps: llm_rating_json
+    wraps: allm_rating_json
     criteria: |
       1. Make sure sentences are concise and don't use flowery language.
       2. It shouldn't sound too salesy or promotional.

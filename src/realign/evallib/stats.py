@@ -1,7 +1,7 @@
 import math
 
 from realign.evaluators import evaluator, EvalResult
-
+from realign.utils import try_import
 @evaluator
 def weighted_sum(values, results: list[EvalResult]):
     
@@ -53,3 +53,12 @@ def elo_ratings(preferences: list[tuple[str, str]],
     return ranked_choices
 
 
+@evaluator
+def pymean(values):
+    return sum(values) / len(values)
+
+np = try_import('numpy')
+
+@evaluator
+def numpy_mean(values):
+    return np.mean(values)

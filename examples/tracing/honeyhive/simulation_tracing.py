@@ -1,9 +1,6 @@
-import os
-from realign.simulation import Simulation
-from realign.llm_utils import allm_messages_call, llm_messages_call
+from realign import Simulation, allm_messages_call, llm_messages_call
 
 import realign
-realign.config.path = 'examples/tracing/honeyhive/config.yaml'
 realign.tracing.honeyhive_key = '<YOUR_HONEYHIVE_API_KEY>'
 realign.tracing.honeyhive_project = '<YOUR_HONEYHIVE_PROJECT_NAME>'
 

@@ -12,14 +12,14 @@ One solution to this is to have an LLM compare Tweet A vs Tweet B, and select th
 
 Next, we make N * (N-1) requests to an LLM judge to tell us the winner of the 2 tweets to get the winner for each pairwise eval.
 
-This is exactly the logic of the out-of-the-box `allm_choice_judge` evaluator. This evaluator's first param is `choices`, containing all the generations you want to compare. The response is a list of (winner, loser) pairs.
+This is exactly the logic of the out-of-the-box `allm_pairwise_judge` evaluator. This evaluator's first param is `choices`, containing all the generations you want to compare. The response is a list of (winner, loser) pairs.
 
 Now that we have a pairs of (winner, loser), we want to use these to create some kind of ranking. For this, we can use Elo Ratings.
 
 
 > **Elo Ratings** are a rating system used to calculate the relative skill levels of players in two-player games, most famously in chess.
 
-In this case, we can plug in Realign's out-of-the-box `elo_rating` evaluator to aggregate the values from the `allm_choice_judge`. This will return a list of pairs of (tweet, rating) sorted in descending order of rating. 
+In this case, we can plug in Realign's out-of-the-box `elo_rating` evaluator to aggregate the values from the `allm_pairwise_judge`. This will return a list of pairs of (tweet, rating) sorted in descending order of rating. 
 
 The highest rated tweet is the overall winner, and the lowest rated tweet the overall loser.
 
@@ -27,7 +27,7 @@ The highest rated tweet is the overall winner, and the lowest rated tweet the ov
 ```yaml
 evaluators:
   llm_tweet_choice_judge:
-    wraps: allm_choice_judge
+    wraps: allm_pairwise_judge
     criteria: |
       - Make sure sentences are concise and don't use flowery language.
       - It should say something interesting to an AI developer.

@@ -1,7 +1,7 @@
 import os
 import json
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from typing import Any, Optional, Callable, Union, Coroutine
 import hashlib
 import yaml
@@ -13,7 +13,6 @@ from litellm import ModelResponse, aembedding, acompletion, validate_environment
 import litellm
 
 from realign.router import Router
-from realign.configs import load_yaml_settings
 from realign.utils import bcolors, run_async
 
 
@@ -25,7 +24,6 @@ router = Router()
         
 # Register the cleanup function
 # atexit.register(lambda: router or router.__del__())
-
 
 @dataclass
 class OpenAIMessage:
@@ -206,6 +204,31 @@ class AgentSettings:
         self.template_params = template_params
         return self
 
+    def update(self, agent_settings: Any) -> None:
+        if isinstance(agent_settings, dict):
+            update_dict = agent_settings
+        elif isinstance(agent_settings, AgentSettings):
+            update_dict = agent_settings.__dict__
+        else:
+            raise TypeError(
+                "agent_settings must be either a dictionary or an AgentSettings instance. Got {}".format(
+                    type(agent_settings)
+                )
+            )
+
+        valid_fields = {f.name for f in fields(self)}
+
+        for key, value in update_dict.items():
+            if key not in valid_fields:
+                raise ValueError(f"Invalid field name: {key}")
+            if value is not None:  # Only update if the value is not None
+                setattr(self, key, value)
+
+
+# holds the config for agents
+all_agent_settings: dict[str, AgentSettings] = dict()
+
+
 def print_system_prompt(prompt, role='assistant'):
     print(system_prompt_str(AgentSettings(system_prompt=prompt, role=role, model='')))
 
@@ -304,9 +327,7 @@ def llm_call_resolve_agent_settings(
         elif isinstance(agent_settings_or_name, dict):
             agent_settings_to_use = AgentSettings(**agent_settings_or_name)
         elif isinstance(agent_settings_or_name, str):
-            agent_settings_to_use = get_agent_settings(
-                agent_name=agent_settings_or_name
-            )
+            agent_settings_to_use = all_agent_settings[agent_settings_or_name]
 
     # Then, check agent_settings
     if agent_settings_to_use is None and agent_settings is not None:
@@ -317,7 +338,7 @@ def llm_call_resolve_agent_settings(
 
     # Then, check agent_name
     if agent_settings_to_use is None and agent_name is not None:
-        agent_settings_to_use = get_agent_settings(agent_name=agent_name)
+        agent_settings_to_use = all_agent_settings[agent_name]
 
     # If still None, use default settings
     if agent_settings_to_use is None:
@@ -519,33 +540,6 @@ async def aembed_text(text: str, **kwargs):
 def messages_to_string(messages: list[OpenAIMessage]) -> str:
     """Convert a list of messages to a string"""
     return "\n".join([m.role + ":\n" + m.content for m in messages])
-
-
-def get_agent_settings(
-    yaml_file: Optional[str] = None, agent_name: Optional[str] = None
-) -> dict[str, AgentSettings] | AgentSettings:
-
-    parsed_yaml = load_yaml_settings(yaml_file)
-
-    if not isinstance(parsed_yaml, dict) or "llm_agents" not in parsed_yaml:
-        raise ValueError(
-            "Invalid YAML structure. Expected 'llm_agents' key at the root level."
-        )
-
-    assert isinstance(
-        parsed_yaml["llm_agents"], dict
-    ), "llm_agents must be a dictionary"
-
-    agent_settings = {}
-    for _agent_name, settings in parsed_yaml["llm_agents"].items():
-        agent_settings[_agent_name] = AgentSettings(**settings)
-
-    if agent_name is not None:
-        if agent_name not in agent_settings:
-            raise ValueError(f"Agent '{agent_name}' not found in 'llm_agents' section.")
-        return agent_settings[agent_name]
-
-    return agent_settings
 
 
 def get_realign_llm_utils_globals():

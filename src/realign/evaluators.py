@@ -1,13 +1,10 @@
 import asyncio
-from dataclasses import dataclass, fields
-from typing import Any, Optional, Callable, Coroutine, Awaitable
+from dataclasses import dataclass, field, fields
+from typing import Any, Optional, Callable, Coroutine
 import inspect
 import functools
-import os
 import json
 
-import realign
-from realign.configs import load_yaml_settings
 from realign.utils import bcolors
 
 
@@ -16,37 +13,36 @@ from realign.utils import bcolors
 # ------------------------------------------------------------------------------
 
 
-DEFAULT_EVALUATOR_SETTINGS = {
-    "wraps": None,
-    "weight": 1.0,
-    "asserts": False,
-    "repeat": None,
-    "transform": None,
-    "aggregate": None,
-    "checker": None,
-    "target": None,
-    "evaluate": None,
-}
 
-EVALUATOR_SETTINGS_KEYS = DEFAULT_EVALUATOR_SETTINGS.keys()
+EVALUATOR_SETTINGS_KEYS = [
+    'wraps', 
+    'weight', 
+    'asserts', 
+    'repeat', 
+    'transform', 
+    'aggregate', 
+    'checker', 
+    'target', 
+    'evaluate'
+]
 
 
 @dataclass
 class EvalSettings:
-    type: str
-    wraps: Optional[str] = DEFAULT_EVALUATOR_SETTINGS["wraps"]
-    weight: float = DEFAULT_EVALUATOR_SETTINGS["weight"]
-    asserts: bool = DEFAULT_EVALUATOR_SETTINGS["asserts"]
-    repeat: Optional[int] = DEFAULT_EVALUATOR_SETTINGS["repeat"]
-    transform: Optional[str] = DEFAULT_EVALUATOR_SETTINGS["transform"]
-    aggregate: Optional[str] = DEFAULT_EVALUATOR_SETTINGS["aggregate"]
-    checker: Optional[str] = DEFAULT_EVALUATOR_SETTINGS["checker"]
-    target: Optional[str] = DEFAULT_EVALUATOR_SETTINGS["target"]
-    evaluate: Optional[str] = DEFAULT_EVALUATOR_SETTINGS["evaluate"]
+    name: str  # config key
+    wraps: Optional[str | dict] = None
+    weight: float = None
+    asserts: bool = None
+    repeat: Optional[int] = None
+    transform: Optional[str] = None
+    aggregate: Optional[str] = None
+    checker: Optional[str] = None
+    target: Optional[str] = None
+    evaluate: Optional[str] = None
 
     def copy(self) -> "EvalSettings":
         return EvalSettings(
-            type=self.type,
+            name=self.name,
             wraps=self.wraps,
             weight=self.weight,
             repeat=self.repeat,
@@ -57,11 +53,14 @@ class EvalSettings:
             target=self.target,
             evaluate=self.evaluate,
         )
-
+    
     def keys(self):
         return self.__dict__.keys()
 
-    def update(self, eval_settings: Any) -> None:
+    # TODO: settings update should replace instead of merge
+    def update(self, eval_settings: Any | None) -> None:
+        if eval_settings is None:
+            return
         if isinstance(eval_settings, dict):
             update_dict = eval_settings
         elif isinstance(eval_settings, EvalSettings):
@@ -78,64 +77,104 @@ class EvalSettings:
         for key, value in update_dict.items():
             if key not in valid_fields:
                 raise ValueError(f"Invalid field name: {key}")
-            if value is not None:  # Only update if the value is not None
+            if value is not None:
                 setattr(self, key, value)
+    
+    @staticmethod
+    def extract_eval_settings_and_kwargs(settings: dict[str, Any] | None):
+
+        eval_kwargs = dict()
+        eval_settings = dict()
+
+        if settings is not None:
+            for key, value in settings.items():
+                if key in EVALUATOR_SETTINGS_KEYS:
+                    eval_settings[key] = value
+                else:
+                    eval_kwargs[key] = value
+
+        return eval_settings, eval_kwargs
 
     def __str__(self) -> str:
-        dict_str = {k: v for k, v in self.__dict__.items() if v is not None}
+        dict_str = {k: str(v) for k, v in self.__dict__.items() if v is not None}
         return json.dumps(dict_str, indent=4).replace('"', "")
 
-def extract_eval_settings_and_kwargs(settings: dict[str, Any]):
+    def dict(self) -> dict:
+        ret_dict = self.__dict__
+        ret_dict.pop('name', None)
+        return ret_dict
 
-    eval_kwargs = {}
-    eval_settings = {}
-
-    for key, value in settings.items():
-        if key in EVALUATOR_SETTINGS_KEYS:
-            eval_settings[key] = value
-        else:
-            eval_kwargs[key] = value
-
-    return eval_settings, eval_kwargs
-
-
-def get_eval_settings(
-    yaml_file: Optional[str] = None, eval_type: Optional[str] = None
-) -> tuple[EvalSettings, dict] | tuple[dict[str, EvalSettings], dict]:
-
-    parsed_yaml = load_yaml_settings(yaml_file)
-    # update the config path
-    print("Parsed config file:", yaml_file)
-
-    if not isinstance(parsed_yaml, dict):
-        raise ValueError(
-            "Invalid YAML structure."
-        )
+@dataclass
+class EvaluatorSettings:
+    name: str
     
-    if "evaluators" not in parsed_yaml:
-        return dict(), dict()
+    # base default settings
+    default_settings: EvalSettings = None
+    default_kwargs: dict = field(default_factory=dict)
+    
+    # settings from defaults.yaml
+    defaults_yaml_settings: EvalSettings = None
+    defaults_yaml_kwargs: dict = field(default_factory=dict)
+    
+    # settings from evaluator init
+    init_settings: EvalSettings = None
+    init_kwargs: dict = field(default_factory=dict)
+    
+    # settings from decorator kwargs
+    deco_settings: EvalSettings = None
+    deco_kwargs: dict = field(default_factory=dict)
+    
+    # settings from config file
+    config_settings: EvalSettings = None
+    config_kwargs: dict = field(default_factory=dict)
+    
+    # settings from runtime
+    explicit_settings: EvalSettings = None
+    explicit_kwargs: dict = field(default_factory=dict)
+    
 
-    assert isinstance(
-        parsed_yaml["evaluators"], dict
-    ), "evaluators must be a dictionary"
+    def __post_init__(self):
+        self.default_settings = EvalSettings(name=self.name)
+        self.defaults_yaml_settings = EvalSettings(name=self.name)
+        self.init_settings = EvalSettings(name=self.name)
+        self.deco_settings = EvalSettings(name=self.name)
+        self.config_settings = EvalSettings(name=self.name)
+        self.explicit_settings = None # this must be set at runtime
+        
+        # set defaults
+        self.default_settings.asserts = False
+        self.default_settings.weight = 1.0
 
-    evals_settings: dict[str, EvalSettings] = dict()
-    evals_kwargs: dict[str, Any] = dict()
+    def resolve_settings(self, settings: EvalSettings | None = None):
+        if self.explicit_settings:
+            return self.explicit_settings
+        
+        final_settings: EvalSettings = self.default_settings
+        final_settings.update(self.defaults_yaml_settings)
+        final_settings.update(self.init_settings)
+        final_settings.update(self.config_settings)
+        final_settings.update(self.deco_settings)
+        
+        if settings is not None:
+            final_settings.update(settings)
+        
+        return final_settings
+    
+    def resolve_kwargs(self, kwargs: dict | None = None):
+        if self.explicit_kwargs:
+            return self.explicit_kwargs
+        
+        final_kwargs: dict = self.default_kwargs.copy()
+        final_kwargs.update(self.defaults_yaml_kwargs)
+        final_kwargs.update(self.init_kwargs)
+        final_kwargs.update(self.config_kwargs)
+        final_kwargs.update(self.deco_kwargs)
+        
+        if kwargs is not None:
+            final_kwargs.update(kwargs)
 
-    for _eval_type, settings in parsed_yaml["evaluators"].items():
-        eval_settings, eval_kwargs = extract_eval_settings_and_kwargs(settings)
-        evals_settings[_eval_type] = EvalSettings(type=_eval_type, **eval_settings)
-        evals_kwargs[_eval_type] = eval_kwargs
-
-    if eval_type is not None:
-        if eval_type not in evals_settings:
-            return EvalSettings(type=eval_type, **DEFAULT_EVALUATOR_SETTINGS), dict()
-        return evals_settings[eval_type], evals_kwargs[eval_type]
-
-    # return all evaluators
-    return evals_settings, evals_kwargs
-
-
+        return final_kwargs
+        
 # ------------------------------------------------------------------------------
 # EVALUATOR RESULT
 # ------------------------------------------------------------------------------
@@ -151,7 +190,7 @@ class EvalResult:
         # determine the eval_type
         self.init_method = init_method or inspect.stack()[1].function
 
-        self.eval_settings: Optional[EvalSettings] = EvalSettings(type=self.init_method)
+        self.eval_settings: Optional[EvalSettings] = EvalSettings(name=self.init_method)
         self.eval_kwargs: Optional[dict] = dict()
 
         # for easy access
@@ -196,8 +235,8 @@ class EvalResult:
                     and (value := getattr(self.eval_settings, key)) is not None
                 ):
                     if (
-                        key in DEFAULT_EVALUATOR_SETTINGS
-                        and value != DEFAULT_EVALUATOR_SETTINGS[key]
+                        key in EVALUATOR_SETTINGS_KEYS
+                        and value is not None
                     ):
                         result += f'{" " * (indent + 8)}{key}: {value}\n'
 
@@ -278,103 +317,97 @@ class evaluator:
     # STATICS / INITIALIZE
     # ------------------------------------------------------------------------------
 
-    all_evaluators: dict[str, "evaluator" | Callable | Coroutine | None] = dict()
-    
-    # parses the default config file and loads its settings and kwargs.
-    all_eval_settings, all_eval_kwargs = get_eval_settings(
-        yaml_file=os.path.join(os.path.dirname(__file__), realign.config.path)
-    )
+    all_evaluators: dict[str, "evaluator" | Callable | Coroutine | "aevaluator"] = dict()
+    all_evaluator_settings: dict[str, EvaluatorSettings] = dict()
 
     def __unnamed__(self, *args, **kwargs):
         raise NotImplementedError(f"Please decorate with an evaluator implementation.")
 
-    def __new__(cls, 
+    def __new__(
+        cls, 
         func=None, 
         eval_settings=None, 
         eval_kwargs=None, 
-        **deco_kwargs
+        **deco_settings_kwargs
     ) -> "evaluator":
         """Allows evaluator to be initialized in the decorator with kwargs"""
         if func is None:
-            return lambda f: cls(f, eval_settings, eval_kwargs, **deco_kwargs)
+            return lambda f: cls(f, eval_settings, eval_kwargs, **deco_settings_kwargs)
         return super().__new__(cls)
 
     def __init__(
         self,
         func: Callable = __unnamed__,
-        eval_settings: EvalSettings = None,
-        eval_kwargs: dict[str, Any] = None,
-        **decorator_kwargs,
+        eval_settings: EvalSettings | None = None,
+        eval_kwargs: dict[str, Any] | None = None,
+        **deco_settings_kwargs,
     ) -> None:
-
+        
         # set the wrapped function implementation and its name
         self.func: Callable = func
 
-        if hasattr(func, "__name__"):
-            self.name: str = func.__name__
-        else:
-            self.name: str = str(func)
+        # set the evaluator name
+        self.name: str = func.__name__ if hasattr(func, "__name__") else str(func)
+        
+        # register all_evaluators[func name] = this evaluator
+        self.all_evaluators[self.name] = self
+        
+        # initialize the evaluator settings
+        if self.name not in evaluator.all_evaluator_settings:
+            evaluator.all_evaluator_settings[self.name] = EvaluatorSettings(self.name)
 
-        # default values >> default config >> init args >> decorator kwargs
-        # >> user config >> user init args >> user decorator kwargs
+        # get the settings
+        evaluator_settings = evaluator.all_evaluator_settings[self.name]
+            
+        # init settings
+        if eval_settings:
+            eval_settings.name = self.name
+        else:
+            eval_settings = EvalSettings(name=self.name)
         
-        # default values
-        self.eval_settings = EvalSettings(type=self.name)
-        self.eval_kwargs = dict()
-        
-        # default config
-        self.eval_settings.update(self.all_eval_settings.get(self.name, {}))
-        self.eval_kwargs.update(self.all_eval_kwargs.get(self.name, {}))
-        
-        # init args
-        self.eval_settings.update(eval_settings or {})
-        self.eval_kwargs.update(eval_kwargs or {})
+        evaluator_settings.init_settings = eval_settings
+        evaluator_settings.init_kwargs = eval_kwargs or {}
         
         # decorator kwargs
-        kwarg_eval_settings, kwarg_eval_kwargs = extract_eval_settings_and_kwargs(
-            decorator_kwargs
+        kwarg_eval_settings, kwarg_eval_kwargs = EvalSettings.extract_eval_settings_and_kwargs(
+            deco_settings_kwargs
         )
-        self.eval_settings.update(kwarg_eval_settings)
-        self.eval_kwargs.update(kwarg_eval_kwargs)
-
-        # set all_evaluators[func name] = this evaluator
-        self.all_evaluators[self.name] = self
+        kwarg_eval_settings['name'] = self.name
+        evaluator_settings.deco_settings = EvalSettings(**kwarg_eval_settings)
+        evaluator_settings.deco_kwargs = kwarg_eval_kwargs
+        
+        self.explicit_config = None
 
         # sets decorator metadata to that of wrapped function
         functools.update_wrapper(self, func)
+        functools.update_wrapper(func, self)
 
+        # traces
         self.prev_runs = []
-
         self._prev_run = None
 
-    @classmethod
-    def initialize_evaluators(cls):
-        """
-        After we have loaded the eval settings/kwargs, and defined the init function,
-        we can initialize all_evaluators in the config.
-        """
-        print("Initializing evaluators...")
-        # instantiate all evaluators in config
-        for eval_name in cls.all_eval_settings.keys():
-            if eval_name not in cls.all_evaluators:
-                cls.all_evaluators[eval_name] = cls()
-
     # ------------------------------------------------------------------------------
-    # CALLING
-    # ------------------------------------------------------------------------------
-
+    # AGGREGATION
     def pre_apply_aggregation(
         self,
         eval_results: tuple[EvalResult] | list[EvalResult],
         eval_scores: tuple | list,
+        final_settings: EvalSettings,
     ) -> tuple[EvalResult, Any] | Coroutine:
 
-        locals_dict = {"values": eval_scores, "results": eval_results}
+        locals_dict = {
+            "values": eval_scores, 
+            "results": eval_results
+        }
 
-        aggregation_expr = str(self.eval_settings.aggregate)
+        aggregation_expr = str(final_settings.aggregate)
 
         # apply aggregation
-        aggregate_score = eval(aggregation_expr, self.all_evaluators, locals_dict)
+        aggregate_score = eval(
+            aggregation_expr, 
+            evaluator.all_evaluators, 
+            locals_dict
+        )
 
         return aggregate_score
 
@@ -382,15 +415,16 @@ class evaluator:
         self,
         eval_results: tuple[EvalResult] | list[EvalResult] | EvalResult,
         aggregate_score: Any,
+        final_settings: EvalSettings,
     ):
         init_methods = set()
 
         # if no repetitions, we will only have one eval result
-        if type(eval_results) == EvalResult:
+        if isinstance(eval_results, EvalResult):
             init_methods.add(eval_results.init_method)
         else:
             for eval_result in eval_results:
-                if type(eval_result) == EvalResult:
+                if isinstance(eval_result, EvalResult):
                     init_methods.add(eval_result.init_method)
 
         init_method = "aggregate: "
@@ -398,7 +432,9 @@ class evaluator:
             init_method += "-".join(init_methods)
 
         aggregate_result = EvalResult(
-            aggregate_score, init_method=init_method, prev_results=eval_results
+            aggregate_score, 
+            init_method=init_method, 
+            prev_results=eval_results
         )
 
         return aggregate_result
@@ -407,14 +443,25 @@ class evaluator:
         self,
         eval_results: tuple[EvalResult] | list[EvalResult] | EvalResult,
         eval_scores: tuple | list | Any,
+        final_settings: EvalSettings,
     ) -> tuple[EvalResult, Any]:
 
-        if not self.eval_settings.aggregate:
+        if not final_settings.aggregate:
             return eval_results, eval_scores
 
-        aggregate_score = self.pre_apply_aggregation(eval_results, eval_scores)
-
-        aggregate_result = self.post_apply_aggregation(eval_results, aggregate_score)
+        aggregate_score = self.pre_apply_aggregation(
+            eval_results, 
+            eval_scores, 
+            final_settings
+        )
+        
+        aggregate_score = evaluator.resolve_pipeline(aggregate_score, eval_scores)
+            
+        aggregate_result = self.post_apply_aggregation(
+            eval_results, 
+            aggregate_score, 
+            final_settings
+        )
 
         return aggregate_result, aggregate_score
 
@@ -422,42 +469,70 @@ class evaluator:
         self,
         eval_results: tuple[EvalResult] | list[EvalResult],
         eval_scores: tuple | list,
+        final_settings: EvalSettings,
     ) -> tuple[EvalResult, Any]:
 
-        if not self.eval_settings.aggregate:
+        if not final_settings.aggregate:
             return eval_results, eval_scores
 
-        aggregate_score = self.pre_apply_aggregation(eval_results, eval_scores)
+        aggregate_score = self.pre_apply_aggregation(
+            eval_results, 
+            eval_scores, 
+            final_settings
+        )
 
-        if isinstance(aggregate_score, Awaitable):
-            aggregate_score = await aggregate_score
+        aggregate_score = await evaluator.aresolve_pipeline(aggregate_score, eval_scores)
 
-        aggregate_result = self.post_apply_aggregation(eval_results, aggregate_score)
+        aggregate_result = self.post_apply_aggregation(
+            eval_results, 
+            aggregate_score, 
+            final_settings
+        )
 
         return aggregate_result, aggregate_score
+    # ------------------------------------------------------------------------------
 
-    def pre_apply_transformation(self, eval_result: EvalResult, eval_score: Any):
 
-        transform_expr = str(self.eval_settings.transform)
+    # ------------------------------------------------------------------------------
+    # TRANSFORMATION
+    def pre_apply_transformation(
+        self, 
+        eval_result: EvalResult, 
+        eval_score: Any,
+        final_settings: EvalSettings,
+    ):
 
-        locals_dict = {"value": eval_score, "result": eval_result}
+        transform_expr = str(final_settings.transform)
+
+        locals_dict = {
+            "value": eval_score, 
+            "result": eval_result
+        }
 
         # apply transformation
-        transformed_score = eval(transform_expr, self.all_evaluators, locals_dict)
+        transformed_score = eval(
+            transform_expr, 
+            evaluator.all_evaluators, 
+            locals_dict
+        )
 
         return transformed_score
 
     def post_apply_transformation(
-        self, eval_result: EvalResult, transformed_score: Any
+        self, 
+        eval_result: EvalResult, 
+        transformed_score: Any,
+        final_settings: EvalSettings,
     ):
         init_method = "transform: " + eval_result.init_method
 
         transformed_result = EvalResult(
-            transformed_score, init_method=init_method, prev_results=eval_result
+            transformed_score, 
+            init_method=init_method, 
+            prev_result=eval_result
         )
-
-        # TODO: we should use call time weights here
-        transformed_result.weight = self.eval_settings.weight
+        
+        transformed_result.weight = final_settings.weight
 
         return transformed_result
 
@@ -465,18 +540,24 @@ class evaluator:
         self,
         eval_result: EvalResult,
         eval_score: Any,
+        final_settings: EvalSettings,
     ) -> tuple[EvalResult, Any]:
 
-        if not self.eval_settings.transform:
+        if not final_settings.transform:
             return eval_result, eval_score
 
-        transformed_score = self.pre_apply_transformation(eval_result, eval_score)
+        transformed_score = self.pre_apply_transformation(
+            eval_result, 
+            eval_score, 
+            final_settings
+        )
 
-        if isinstance(transformed_score, Awaitable):
-            transformed_score = await transformed_score
+        transformed_score = await evaluator.aresolve_pipeline(transformed_score, eval_score)
 
         transformed_result = self.post_apply_transformation(
-            eval_result, transformed_score
+            eval_result, 
+            transformed_score, 
+            final_settings
         )
 
         return transformed_result, transformed_score
@@ -485,33 +566,49 @@ class evaluator:
         self,
         eval_result: EvalResult,
         eval_score: Any,
+        final_settings: EvalSettings,
     ) -> tuple[EvalResult, Any]:
 
-        if not self.eval_settings.transform:
+        if not final_settings.transform:
             return eval_result, eval_score
 
-        transformed_score = self.pre_apply_transformation(eval_result, eval_score)
+        transformed_score = self.pre_apply_transformation(
+            eval_result, eval_score, final_settings
+        )
+        
+        transformed_score = evaluator.resolve_pipeline(transformed_score, eval_score)
 
         transformed_result = self.post_apply_transformation(
-            eval_result, transformed_score
+            eval_result, transformed_score, final_settings
         )
 
         return transformed_result, transformed_score
+    # ------------------------------------------------------------------------------
 
+
+    # ------------------------------------------------------------------------------
+    # CHECKER
     def pre_run_checker(
         self,
         eval_result: EvalResult,
         eval_score: Any,
-        checker: Optional[str],
-        target=None,
+        final_settings: EvalSettings,
     ) -> bool:
 
-        checker_expr = str(checker)
+        checker_expr = str(final_settings.checker)
 
-        locals_dict = {"value": eval_score, "result": eval_result, "target": target}
+        locals_dict = {
+            "value": eval_score, 
+            "result": eval_result, 
+            "target": final_settings.target
+        }
 
         # evaluate checker
-        checker_score = eval(checker_expr, self.all_evaluators, locals_dict)
+        checker_score = eval(
+            checker_expr, 
+            evaluator.all_evaluators, 
+            locals_dict
+        )
 
         return checker_score
 
@@ -519,20 +616,21 @@ class evaluator:
         self,
         eval_result: EvalResult,
         eval_score: Any,
-        target=None,
-        asserts=None,
+        final_settings: EvalSettings,
         checker_score: Any = None,
     ) -> bool:
 
-        if asserts:
+        if final_settings.asserts:
             assert (
                 checker_score
-            ), f"Assertion failed: score {eval_score} is not in range {target}"
+            ), f"Assertion failed: score {eval_score} is not in range {final_settings.target}"
 
         init_method = "checker: " + eval_result.init_method
 
         checker_result = EvalResult(
-            checker_score, init_method=init_method, prev_result=eval_result
+            checker_score, 
+            init_method=init_method, 
+            prev_result=eval_result
         )
 
         return checker_result
@@ -541,23 +639,30 @@ class evaluator:
         self,
         eval_result: EvalResult,
         eval_score: Any,
-        checker: Optional[str],
-        target=None,
-        asserts=None,
+        final_settings: EvalSettings,
     ) -> bool:
 
-        if not checker:
-            if not asserts:
+        if not final_settings.checker:
+            if not final_settings.asserts:
                 return eval_result, eval_score
 
-            assert eval_score, f"Assertion failed: score {eval_score}"
+            assert eval_score, f"Assertion failed: score {eval_score} is not in range {final_settings.target}"
 
             return eval_result, eval_score
 
-        checker_score = self.pre_run_checker(eval_result, eval_score, checker, target)
+        checker_score = self.pre_run_checker(
+            eval_result, 
+            eval_score, 
+            final_settings
+        )
+        
+        checker_score = evaluator.resolve_pipeline(checker_score, eval_score, final_settings.target)
 
         checker_result = self.post_run_checker(
-            eval_result, eval_score, target, asserts, checker_score
+            eval_result, 
+            eval_score, 
+            final_settings, 
+            checker_score
         )
 
         return checker_result, checker_score
@@ -566,69 +671,256 @@ class evaluator:
         self,
         eval_result: EvalResult,
         eval_score: Any,
-        checker: Optional[str],
-        target=None,
-        asserts=None,
+        final_settings: EvalSettings,
     ) -> bool:
 
-        if not checker:
-            if not asserts:
+        if not final_settings.checker:
+            if not final_settings.asserts:
                 return eval_result, eval_score
 
-            assert eval_score, f"Assertion failed: score {eval_score}"
+            assert eval_score, f"Assertion failed: score {eval_score} is not in range {final_settings.target}"
 
             return eval_result, eval_score
 
-        checker_score = self.pre_run_checker(eval_result, eval_score, checker, target)
+        checker_score = self.pre_run_checker(
+            eval_result, 
+            eval_score,
+            final_settings
+        )
 
-        if isinstance(checker_score, Awaitable):
-            checker_score = await checker_score
+        checker_score = await evaluator.aresolve_pipeline(checker_score, eval_score, final_settings.target)
 
         checker_result = self.post_run_checker(
-            eval_result, eval_score, target, asserts, checker_score
+            eval_result, 
+            eval_score, 
+            final_settings, 
+            checker_score
         )
 
         return checker_result, checker_score
+    # ------------------------------------------------------------------------------
+    
+    
+    # ------------------------------------------------------------------------------
+    # WRAPPING
+    @staticmethod
+    def parse_wraps(wraps: str | dict | None | Any):
+        if wraps is None:
+            return None, {}
+        
+        if isinstance(wraps, str):
+            return wraps, {}
+        elif isinstance(wraps, dict):
+            # assert that there is a single key of type str
+            assert len(wraps) == 1 and isinstance(list(wraps.keys())[0], str), \
+                "wraps must be a single key of type str"
+            
+            wrapped_eval_name = list(wraps.keys())[0]
+            wrapped_eval_settings_kwargs = wraps[wrapped_eval_name]
+            return wrapped_eval_name, wrapped_eval_settings_kwargs
+        else:
+            raise ValueError(f"Invalid wraps type: {type(wraps)}")
+    
+    @staticmethod
+    def create_wrapper(
+        base_callable: 'evaluator',
+        wrapped_eval_settings: EvalSettings,
+        wrapped_eval_kwargs: dict,
+        wrapper_name: str,
+    ) -> Callable:
+        """
+        Create a wrapper function for an evaluator, given the base evaluator,
+        the wrapped evaluator settings, the wrapped evaluator kwargs, and the wrapper name.
+        
+        The wrapped_eval / base_callable's settings and kwargs update any previous settings and kwargs.
+        The wrapper's settings do NOT update the wrapped evaluator's settings.
+        The wrapper's kwargs DO update the wrapped evaluator's kwargs.
+        
+        The final settings and kwargs are passed into the wrapped evaluator during calltime.
+        Due to the ordering of the dict unpacking, the wrapper's kwargs will update the 
+        wrapped evaluator's kwargs. The settings are also passed as kwargs into the base callable.
 
-    def get_result(self, score, *call_args, **call_kwargs) -> EvalResult:
-        # create result
-        result = EvalResult(score, init_method=self.name)
-        # shouldn't this update with call_kwargs?
-        result.eval_settings = self.eval_settings
-        result.eval_kwargs = call_kwargs
-        result.func_impl = f"{self.func.__module__}.{self.func.__name__}"
-        result.func_args = call_args
-        result.func_kwargs = call_kwargs
-        result.call_depth = call_context["depth"]
+        Args:
+            base_callable (evaluator): The base evaluator to be wrapped.
+            wrapped_eval_settings (EvalSettings): Settings for the wrapped evaluator.
+            wrapped_eval_kwargs (dict): Additional keyword arguments for the wrapped evaluator.
+            wrapper_name (str): Name for the wrapper function.
 
-        return result
+        Returns:
+            Callable: A wrapper function that calls the base evaluator with the provided settings and arguments.
+        """
+        
+        
+        base_callable_settings = wrapped_eval_settings.copy()
+        base_callable_kwargs = wrapped_eval_kwargs.copy()
+        
+        if asyncio.iscoroutinefunction(base_callable.func):
+            async def afunc(*args, **kwargs):
+                return await base_callable(
+                    *args,
+                    ** {
+                        **base_callable_settings.dict(),
+                        **base_callable_kwargs,
+                        **kwargs
+                    }
+                )
+            afunc.__name__ = wrapper_name
+            return afunc
+        
+        def func(*args, **kwargs):
+            return base_callable(
+                *args,
+                ** {
+                    **base_callable_settings.dict(),
+                    **base_callable_kwargs,
+                    **kwargs
+                }
+            )
+        func.__name__ = wrapper_name
+        return func
+    
+    @staticmethod
+    def create_wrapped_evaluator(
+        evaluator_settings: EvaluatorSettings
+    ) -> None:
+        
+        wrapper_name = evaluator_settings.name
+        wrapper_settings = evaluator_settings.resolve_settings()
+        wrapper_kwargs = evaluator_settings.resolve_kwargs()
+        
+        # parse the wrapped evaluator
+        wrapped_eval_name, wrapped_eval_settings_kwargs = evaluator.parse_wraps(
+            wrapper_settings.wraps
+        )
+        assert isinstance(wrapped_eval_name, str), \
+            f"wrapped evaluator name must be a string but got: {type(wrapped_eval_name)}"
+        
+        wrapped_eval_settings, wrapped_eval_kwargs = \
+            EvalSettings.extract_eval_settings_and_kwargs(wrapped_eval_settings_kwargs)
+        
+        # create the wrapped evaluator settings if not already created
+        # this can happen if the wrapped evaluator is not defined in any config file
+        if wrapped_eval_name not in evaluator.all_evaluator_settings:
+            evaluator.all_evaluator_settings[wrapped_eval_name] = EvaluatorSettings(name=wrapped_eval_name)
+        
+        
+        # get the wrapped evaluator. It must be a registered evaluator
+        base_callable = eval(
+            wrapped_eval_name, 
+            evaluator.all_evaluators,
+        )
+        
+        # TODO: if the base callable is not a Callable but
+        # not an evaluator, we need to wrap it as well
+        assert isinstance(base_callable, evaluator)
+        
+        
+        
+        # update the wrapped evaluator settings with the wrapper settings
+        final_wrapped_eval_settings = evaluator.all_evaluator_settings[wrapped_eval_name].resolve_settings().copy()
+        final_wrapped_eval_settings.update(wrapped_eval_settings)
+        
+        # update the wrapped evaluator kwargs with the wrapper kwargs
+        final_wrapped_eval_kwargs = evaluator.all_evaluator_settings[wrapped_eval_name].resolve_kwargs().copy()
+        final_wrapped_eval_kwargs.update(wrapped_eval_kwargs)
+        
+        # the wrapper's kwargs merge with the wrapped evaluator's kwargs,
+        # but the settings don't.
+        final_wrapped_eval_kwargs.update(wrapper_kwargs)
+        
+        
+        if asyncio.iscoroutinefunction(base_callable.func):
+            afunc: Coroutine = evaluator.create_wrapper(
+                base_callable,
+                final_wrapped_eval_settings,
+                final_wrapped_eval_kwargs,
+                wrapper_name,
+            )
+            
+            # initialize and register the wrapper eval
+            aevaluator(func=afunc)
+            
+        else:
+            # make the wrapper eval
+            func: Callable = evaluator.create_wrapper(
+                base_callable,
+                final_wrapped_eval_settings,
+                final_wrapped_eval_kwargs,
+                wrapper_name,
+            )
+
+            # initialize and register the wrapper eval
+            evaluator(func=func)
+    # ------------------------------------------------------------------------------
+
+
+    # ------------------------------------------------------------------------------
+    # CALLING
+    @staticmethod
+    async def aresolve_pipeline(score, *args, **kwargs):
+        if asyncio.iscoroutinefunction(score) or isinstance(score, aevaluator):
+            score = await score(*args, **kwargs)
+        elif isinstance(score, Callable):
+            score = score(*args, **kwargs)
+
+        return score
+    
+    @staticmethod
+    def resolve_pipeline(score, *args, **kwargs):
+        # string evaluated to a function
+        if isinstance(score, Callable) or isinstance(score, evaluator):
+            score = score(*args, **kwargs)
+        return score
+    
+    def get_final_settings_and_kwargs(self, call_kwargs):
+        eval_settings, eval_kwargs = EvalSettings.extract_eval_settings_and_kwargs(call_kwargs)
+        explicit_settings, explicit_kwargs = EvalSettings.extract_eval_settings_and_kwargs(self.explicit_config)
+        
+        # calltime copy
+        final_settings = self.settings.copy()
+        final_settings.update(eval_settings)
+        final_settings.update(explicit_settings)
+        
+        final_kwargs = self.kwargs.copy()
+        final_kwargs.update(eval_kwargs)
+        final_kwargs.update(explicit_kwargs)
+        
+        return final_settings, final_kwargs
 
     async def async_call(self, *call_args, **call_kwargs):
-
-        # get call kwargs
-        target = call_kwargs.get("target", self.eval_settings.target)
-        asserts = call_kwargs.get("asserts", self.eval_settings.asserts)
-        checker = call_kwargs.get("checker", self.eval_settings.checker)
+        
+        final_settings, final_kwargs = self.get_final_settings_and_kwargs(call_kwargs)
 
         async def asingle_evaluation() -> tuple[EvalResult, Any]:
 
             # run the evaluator
-            score = await self.func(*call_args, **call_kwargs)
-            result = self.get_result(score, *call_args, **call_kwargs)
+            score = await self.func(*call_args, **final_kwargs)
+            result = EvalResult(
+                score=score, 
+                init_method=self.name,
+                eval_settings=final_settings,
+                eval_kwargs=final_kwargs,
+                func_impl=f"{self.func.__module__}.{self.func.__name__}",
+                func_args=call_args,
+                func_kwargs=call_kwargs,
+                call_depth=call_context["depth"]
+            )
 
             # transform
             transformed_result, transformed_score = (
-                await self.async_apply_transformation(result, score)
+                await self.async_apply_transformation(
+                    result, 
+                    score, 
+                    final_settings
+                )
             )
 
             # check target on transform if aggregate not defined
-            if not self.eval_settings.aggregate:
+            if not final_settings.aggregate:
                 checker_result, checker_score = await self.arun_checker(
                     eval_result=transformed_result,
                     eval_score=transformed_score,
-                    checker=checker,
-                    target=target,
-                    asserts=asserts,
+                    final_settings=final_settings,
                 )
 
                 return checker_result, checker_score
@@ -636,10 +928,13 @@ class evaluator:
             return transformed_result, transformed_score
 
         # execute repetition
-        if self.eval_settings.repeat:
+        if final_settings.repeat:
             # Parallel evaluation
             results_scores = await asyncio.gather(
-                *(asingle_evaluation() for _ in range(self.eval_settings.repeat))
+                *(
+                    asingle_evaluation() 
+                    for _ in range(final_settings.repeat)
+                )
             )
             results, scores = zip(*results_scores)
             results = tuple(results)
@@ -649,17 +944,17 @@ class evaluator:
 
         # apply aggregation
         aggregate_result, aggregate_score = await self.async_apply_aggregation(
-            results, scores
+            results, 
+            scores, 
+            final_settings
         )
 
         # check target on aggregate if aggregate defined
-        if self.eval_settings.aggregate:
+        if final_settings.aggregate:
             checker_result, checker_score = await self.arun_checker(
                 eval_result=aggregate_result,
                 eval_score=aggregate_score,
-                checker=checker,
-                target=target,
-                asserts=asserts,
+                final_settings=final_settings,
             )
 
             return checker_result, checker_score
@@ -667,31 +962,38 @@ class evaluator:
         return aggregate_result, aggregate_score
 
     def sync_call(self, *call_args, **call_kwargs):
-
-        # get call kwargs
-        target = call_kwargs.get("target", self.eval_settings.target)
-        asserts = call_kwargs.get("asserts", self.eval_settings.asserts)
-        checker = call_kwargs.get("checker", self.eval_settings.checker)
+        
+        final_settings, final_kwargs = self.get_final_settings_and_kwargs(call_kwargs)
 
         def single_evaluation() -> tuple[EvalResult, Any]:
 
             # run the evaluator
-            score = self.func(*call_args, **call_kwargs)
-            result = self.get_result(score, *call_args, **call_kwargs)
+            score = self.func(*call_args, **final_kwargs)
+            
+            result = EvalResult(
+                score=score, 
+                init_method=self.name,
+                eval_settings=final_settings,
+                eval_kwargs=final_kwargs,
+                func_impl=f"{self.func.__module__}.{self.func.__name__}",
+                func_args=call_args,
+                func_kwargs=call_kwargs,
+                call_depth=call_context["depth"]
+            )
 
             # transform
             transformed_result, transformed_score = self.sync_apply_transformation(
-                result, score
+                result, 
+                score, 
+                final_settings
             )
 
             # check target on transform if aggregate not defined
-            if not self.eval_settings.aggregate:
+            if not final_settings.aggregate:
                 checker_result, checker_score = self.run_checker(
                     eval_result=transformed_result,
                     eval_score=transformed_score,
-                    checker=checker,
-                    target=target,
-                    asserts=asserts,
+                    final_settings=final_settings,
                 )
 
                 return checker_result, checker_score
@@ -699,10 +1001,10 @@ class evaluator:
             return transformed_result, transformed_score
 
         # execute repetition
-        if self.eval_settings.repeat:
+        if final_settings.repeat:
             # Serial evaluation
             results, scores = zip(
-                *tuple(single_evaluation() for _ in range(self.eval_settings.repeat))
+                *tuple(single_evaluation() for _ in range(final_settings.repeat))
             )
             results = tuple(results)
             scores = tuple(scores)
@@ -710,46 +1012,58 @@ class evaluator:
             results, scores = single_evaluation()
 
         # apply aggregation
-        aggregate_result, aggregate_score = self.sync_apply_aggregation(results, scores)
+        aggregate_result, aggregate_score = self.sync_apply_aggregation(
+            results, scores, final_settings
+        )
 
         # check target on aggregate if aggregate defined
-        if self.eval_settings.aggregate:
+        if final_settings.aggregate:
             checker_result, checker_score = self.run_checker(
                 eval_result=aggregate_result,
                 eval_score=aggregate_score,
-                checker=checker,
-                target=target,
-                asserts=asserts,
+                final_settings=final_settings,
             )
 
             return checker_result, checker_score
 
         return aggregate_result, aggregate_score
 
-    def pre_call(self, **kwargs):
-        # if hasattr(self.__call__, 'task_id'):
-        #     task_id = task_id
-        # else:
-        #     if is_in_async_context():
-        #         task = asyncio.current_task()
-        #         task_id = id(task)
-        #     else:
-        #         task_id = task_id
+    def __call__(self, *args, **kwargs) -> Any:
+        
+        # RUN EVALUATOR
+        try:
+            call_context["depth"] += 1
+            results, scores = None, None
+            assert not asyncio.iscoroutinefunction(
+                self.func
+            ), "please use @aevaluator instead of @evaluator for this function"
+            results, scores = self.sync_call(*args, **kwargs)
+        finally:
+            self.process_trace(results)
+        return scores
 
-        eval_settings, eval_kwargs = extract_eval_settings_and_kwargs(kwargs)
+    async def __acall__(self, *args, **kwargs) -> Any:
+        
+        # RUN EVALUATOR
+        try:
+            call_context["depth"] += 1
+            results, scores = None, None
+            if asyncio.iscoroutinefunction(self.func):
+                results, scores = await self.async_call(*args, **kwargs)
+            else:
+                results, scores = self.sync_call(*args, **kwargs)
+        finally:
+            self.process_trace(results)
+        return scores    
 
-        # kwargs override settings
-        old_settings = self.eval_settings
+    def raw(self, *args, **kwargs):
+        return self.func(*args, **kwargs)
 
-        # merge eval_settings and eval_kwargs
-        self.eval_settings.update(eval_settings)
-        merged_kwargs = {**self.eval_kwargs, **eval_kwargs}
-        # settings and kwargs are now final for this call
-
-        call_context["depth"] += 1
-
-        return old_settings, merged_kwargs
-
+    async def araw(self, *args, **kwargs):
+        return await self.func(*args, **kwargs)
+    
+    # ------------------------------------------------------------------------------
+    # TRACING
     def process_trace(self, results):
         if results is None: return
         # if this is the first call, save the result.  Otherwise, add it to the list of previous runs
@@ -778,66 +1092,56 @@ class evaluator:
                     self._prev_run.metadata = {"prev_results": call_context["calls"]}
             else:
                 print("Error tracing results!")
+    # ------------------------------------------------------------------------------
 
-    # TODO: if there was an exception, save the result
-    def __call__(self, *args, **kwargs) -> Any:
-        
-        # RUN EVALUATOR
-        try:
-            old_settings, merged_kwargs = self.pre_call(**kwargs)
-            results, scores = None, None
-            assert not asyncio.iscoroutinefunction(
-                self.func
-            ), "please use @aevaluator instead of @evaluator for this function"
-            results, scores = self.sync_call(*args, **merged_kwargs)
-        finally:
-            self.process_trace(results)
-        self.eval_settings = old_settings
-        return scores
 
-    async def __acall__(self, *args, **kwargs) -> Any:
-        
-        # RUN EVALUATOR
-        try:
-            old_settings, merged_kwargs = self.pre_call(**kwargs)
-            results, scores = None, None
-            if asyncio.iscoroutinefunction(self.func):
-                results, scores = await self.async_call(*args, **merged_kwargs)
-            else:
-                results, scores = self.sync_call(*args, **merged_kwargs)
-        finally:
-            self.process_trace(results)
-        self.eval_settings = old_settings
-        return scores    
-    
-    
-    def raw(self, *args, **kwargs):
-        return self.func(*args, **kwargs)
 
-    async def araw(self, *args, **kwargs):
-        return await self.func(*args, **kwargs)
-    
     # ------------------------------------------------------------------------------
     # PROPERTIES
     # ------------------------------------------------------------------------------
 
     @property
     def settings(self) -> EvalSettings:
-        return self.eval_settings
+        if self.name not in evaluator.all_evaluator_settings:
+            evaluator.all_evaluator_settings[self.name] = EvaluatorSettings(name=self.name)
+        return evaluator.all_evaluator_settings[self.name].resolve_settings()
 
     @settings.setter
     def settings(self, value: EvalSettings):
         assert isinstance(value, EvalSettings)
-        self.eval_settings = value
+        if self.name not in evaluator.all_evaluator_settings:
+            evaluator.all_evaluator_settings[self.name] = EvaluatorSettings(name=self.name)
+        evaluator.all_evaluator_settings[self.name].explicit_settings = value
 
     @property
     def kwargs(self) -> dict[str, Any]:
-        return self.eval_kwargs
+        if self.name not in evaluator.all_evaluator_settings:
+            evaluator.all_evaluator_settings[self.name] = EvaluatorSettings(name=self.name)
+        return evaluator.all_evaluator_settings[self.name].resolve_kwargs()
 
     @kwargs.setter
     def kwargs(self, value: dict):
         assert isinstance(value, dict)
-        self.eval_kwargs = value
+        if self.name not in evaluator.all_evaluator_settings:
+            evaluator.all_evaluator_settings[self.name] = EvaluatorSettings(name=self.name)
+        evaluator.all_evaluator_settings[self.name].explicit_kwargs = value
+
+    @property
+    def config(self) -> dict[str, Any]:
+        if self.explicit_config is None:
+            self.explicit_config = {
+                **self.settings.dict(),
+                **self.kwargs
+            }
+        return self.explicit_config
+    
+    @config.setter
+    def config(self, value: Any):
+        if value is None:
+            self.explicit_config = None
+        else:
+            raise NotImplementedError
+
 
     @property
     def prev_run(self):
@@ -859,19 +1163,32 @@ class evaluator:
         if isinstance(key, str):
             return key
         elif isinstance(key, Callable):
-            return key.__name__
+            if hasattr(key, "__name__"):
+                return key.__name__
+            else:
+                return str(key)
         else:
             raise KeyError(f"Invalid key type: {type(key)}")
 
     @classmethod
     def __class_getitem__(cls, keys):
+        '''
+        Get an evaluator by name or Callable.
+        '''
+        
         if isinstance(keys, (str, Callable)):
-            # Single key access
-            key = cls._validate_key(keys)
+            # Ensure that key is a string
+            key: str = cls._validate_key(keys)
             if key in cls.all_evaluators:
                 return cls.all_evaluators[key]
+            elif key in cls.all_evaluator_settings:
+                # if the evaluator is wrapped, initialize and register the wrapper
+                if (evaluator_settings := cls.all_evaluator_settings[key]) is not None:
+                    # initialize and register the wrapper
+                    evaluator.create_wrapped_evaluator(evaluator_settings)
+                    return cls.all_evaluators[key]
             else:
-                raise KeyError(f"Key '{key}' not found in evaluators.")
+                raise KeyError(f"Key '{key}' not found in evaluators or config.")
         elif isinstance(keys, tuple):
             # Multiple key access
             return [cls.__class_getitem__(key) for key in keys]
@@ -897,10 +1214,3 @@ class aevaluator(evaluator):
     async def raw(self, *args, **kwargs):
         return await self.araw(*args, **kwargs)
 
-
-# ------------------------------------------------------------------------------
-# INSTANTIATE EVALLIB
-# ------------------------------------------------------------------------------
-
-# instantiate all decorated evaluators in evallib
-from realign import evallib

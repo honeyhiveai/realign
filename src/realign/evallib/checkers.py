@@ -22,8 +22,12 @@ def numrange(x, target=None):
 
         left, right = num_interval
         
-        def check(x):
-            return left <= x <= right
+        if isinstance(num_interval, tuple):
+            def check(x):
+                return left < x < right
+        else:
+            def check(x):
+                return left <= x <= right
 
         # if score is iterable, check all elements
         if hasattr(x, '__iter__'):

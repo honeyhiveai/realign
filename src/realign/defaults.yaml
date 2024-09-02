@@ -19,7 +19,7 @@ llm_agents:
     hyperparams:
       temperature: 0
 
-  choice_judge_agent: &choice_judge_agent
+  pairwise_judge_agent: &pairwise_judge_agent
     model: openai/gpt-4o-mini
     template: |
       Based on the given criteria and {{ choices | length }} choices, rank them in order, starting with the choice that fits the criteria best, and ending the choice that fits the criteria worst. 
@@ -41,15 +41,108 @@ llm_agents:
 
 evaluators:
 
+  # hf
+  hf_pipeline: 
+  hf_label_score_aggregator:
+
+  hf_hate_speech:
+    wraps: hf_pipeline
+    task: text-classification
+    model: facebook/roberta-hate-speech-dynabench-r4-target
+
+    checker: value['label'] in target
+    target: [nothate]
+    asserts: off
+
+  hf_sentiment_classifier:
+    wraps: hf_pipeline
+    task: text-classification
+    model: cardiffnlp/twitter-roberta-base-sentiment-latest
+
+    checker: value['label'] in target
+    target: [positive, neutral]
+    asserts: off
+
+  # checkers
+  numrange:
+
+  # llm
+  allm_rating_json:
+    repeat: 3
+    aggregate: allm_rating_json_aggregate
+    agent_settings: *rating_5_star_agent
+
+  allm_pairwise_judge:
+    batch_size: 2
+    agent_settings: *pairwise_judge_agent
+
+  allm_rating_json_aggregate:
+
+  # rag
+  ragas_pipeline:
+
+  ragas_faithfulness:
+    wraps: ragas_pipeline
+    metrics: faithfulness
+
+  ragas_answer_relevancy:
+    wraps: ragas_pipeline
+    metrics: answer_relevancy
+
+  ragas_context_precision:
+    wraps: ragas_pipeline
+    metrics: context_precision
+
+  ragas_context_recall:
+    wraps: ragas_pipeline
+    metrics: context_recall
+
+  ragas_context_entity_recall:
+    wraps: ragas_pipeline
+    metrics: context_entity_recall
+  
+  ragas_noise_sensitivity_relevant:
+    wraps: ragas_pipeline
+    metrics: noise_sensitivity_relevant
+
+  ragas_noise_sensitivity_irrelevant:
+    wraps: ragas_pipeline
+    metrics: noise_sensitivity_irrelevant
+
+  ragas_answer_similarity:
+    wraps: ragas_pipeline
+    metrics: answer_similarity
+  
+  ragas_answer_correctness:
+    wraps: ragas_pipeline
+    metrics: answer_correctness
+
+  ragas_reference_free_rubrics_score:
+    wraps: ragas_pipeline
+    metrics: reference_free_rubrics_score
+
+  ragas_labelled_rubrics_score:
+    wraps: ragas_pipeline
+    metrics: labelled_rubrics_score
+
+  ragas_summarization_score:
+    wraps: ragas_pipeline
+    metrics: summarization_score
+
+  # nlp
+  word_count:
+  character_count:
+  token_count:
+  chat_word_count_by_role:
+  levenshtein_distance:
+  cosine_similarity:
+  keyword_assertion:
+
+  # stats
+  weighted_sum:
+  weighted_mean:
+
   elo_ratings:
     initial_rating: 1500
     k_factor: 32
 
-  allm_choice_judge:
-    batch_size: 2
-    agent_settings: *choice_judge_agent
-
-  llm_rating_json:
-    repeat: 3
-    aggregate: llm_rating_json_aggregate(values)
-    agent_settings: *rating_5_star_agent

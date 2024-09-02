@@ -1,6 +1,4 @@
 
-from typing import Callable
-import inspect
 import warnings
 
 import itertools
@@ -33,36 +31,19 @@ hf = import_module('realign.evallib.hf')
 checkers = import_module('realign.evallib.checkers')
 stats = import_module('realign.evallib.stats')
 llm = import_module('realign.evallib.llm')
+nlp = import_module('realign.evallib.nlp')
+rag = import_module('realign.evallib.rag')
+py = import_module('realign.evallib.py')
 
 # ------------------------------------------------------------------------------
 # LOAD ALL EVALUATORS 
 # ------------------------------------------------------------------------------
 
 EXCLUDE_GLOBALS = [
-    'get_evallib_functions',
     'get_realign_evals_utils',
     'get_python_globals',
-    'evaluator',
     'load_static_eval_funcs',
 ]
-
-def get_evallib_functions(eval_type: str | None = None) -> Callable | None:
-    global_vars = globals()
-    
-    # Filter out the get_evallib_functions function itself
-    filtered_globals = {k: v for k, v in global_vars.items() 
-                        if k not in EXCLUDE_GLOBALS and not k.startswith('__')}
-    
-    # Further filter to include only callable items (functions, classes)
-    callable_globals = {k: v for k, v in filtered_globals.items() 
-                        if callable(v) and inspect.isfunction(v)}
-    
-    if eval_type is None:
-        return callable_globals
-    
-    assert isinstance(eval_type, str), 'eval_type must be a string'
-    
-    return callable_globals.get(eval_type)
 
 def get_realign_evals_utils():
     return {
@@ -214,13 +195,10 @@ def load_static_eval_funcs():
     # get realign globals
     realign_globals = get_realign_evals_utils()
     
-    # get evallib globals
-    evallib_globals = get_evallib_functions()
-    
     # merge all globals in the order of priority
     evaluator.all_evaluators.update(python_globals)
     evaluator.all_evaluators.update(realign_globals)
-    evaluator.all_evaluators.update(evallib_globals)
-    
+
+
 # Load static evaluator functions
 load_static_eval_funcs()

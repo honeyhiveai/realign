@@ -97,12 +97,16 @@ llm_agents:
 evaluators:
 
   tweet_char_count:
-    checker: numrange(value, target)
-    target: (0, 280]
-    asserts: off
+    checker: numrange
+    target: (0, 20]
+    asserts: on
 
   llm_tweet_choice_judge:
-    wraps: allm_choice_judge
+    wraps:
+      allm_pairwise_judge:
+        repeat: 3
+        aggregate: flatten
+    
     criteria: |
       - Make sure sentences are concise and don't use flowery language.
       - It should say something interesting to an AI developer.
@@ -114,6 +118,4 @@ evaluators:
       - Don't make general claims.
       - Don't start with a question.
 
-    aggregate: elo_ratings(values)
-
-
+    aggregate: elo_ratings
