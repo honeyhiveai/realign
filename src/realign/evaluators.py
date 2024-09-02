@@ -311,7 +311,16 @@ class EvalResult:
 call_context: dict[str, Any] = {"depth": 0, "calls": []}
 
 
-class evaluator:
+class EvaluatorMeta(type):
+    
+    def __getattribute__(cls, name):
+        try:
+            return super().__getattribute__(name)
+        except AttributeError:
+            return cls.__class_getitem__(name)
+        
+
+class evaluator(metaclass=EvaluatorMeta):
 
     # ------------------------------------------------------------------------------
     # STATICS / INITIALIZE
@@ -1142,7 +1151,6 @@ class evaluator:
         else:
             raise NotImplementedError
 
-
     @property
     def prev_run(self):
         if isinstance(self._prev_run, EvalResult):
@@ -1153,7 +1161,7 @@ class evaluator:
     def prev_run(self, value):
         call_context["calls"].append(self._prev_run)
         self._prev_run = value
-
+    
     # ------------------------------------------------------------------------------
     # ACCESSORS
     # ------------------------------------------------------------------------------

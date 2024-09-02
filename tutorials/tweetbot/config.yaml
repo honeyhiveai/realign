@@ -37,7 +37,7 @@ evaluators:
     transform: value + 100
     checker: numrange
     target: (0, 280]
-    asserts: on
+    asserts: off
 
   tweet_judge:
     wraps: allm_rating_json

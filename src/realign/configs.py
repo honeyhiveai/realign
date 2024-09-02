@@ -7,7 +7,7 @@ import warnings
 
 from .evaluators import evaluator, EvalSettings, EvaluatorSettings
 from .llm_utils import all_agent_settings, AgentSettings
-from .utils import bcolors
+from .utils import bcolors, dotdict
 
 
 DEFAULT_CONFIG_PATH = "defaults.yaml"
@@ -75,7 +75,7 @@ class Config:
         return path
     
     @staticmethod
-    def get_yaml_content(path: str | None = None) -> dict:
+    def get_yaml_content(path: str | None = None) -> dotdict:
         if path is None:
             raise ValueError("Please specify a config file path.")
         
@@ -85,7 +85,7 @@ class Config:
         
         content = content or dict()
         
-        return content
+        return dotdict(content)
 
     def __set__(self, _, path: Optional[str | Any] = None):   
         
@@ -113,7 +113,7 @@ class Config:
         
         # append the path and content to the config
         Config.config_paths.append(resolved_path)
-        Config.config_contents.append(resolved_yaml_content)
+        Config.config_contents.append(resolved_yaml_content)  # This is now a dotdict
             
         # initialize the evaluators and llm agents
         Config.initialize_evaluators(resolved_yaml_content, resolved_path)
@@ -177,6 +177,9 @@ class ConfigPath:
     @property
     def default(self):
         return Config.config_contents[0]
+    
+    def __getattr__(self, key):
+        return Config.config_contents[-1][key]
         
     def __getitem__(self, key):
         return Config.config_contents[-1][key]

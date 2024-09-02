@@ -8,9 +8,9 @@ def tweet_char_count(text: str) -> int:
 @evaluator
 def compound_guardrail(text):
     
-    hate_speech_guardrail = evaluator['hf_hate_speech'](text)
+    hate_speech_guardrail = evaluator.hf_hate_speech(text)
     
-    sentiment_guardrail = evaluator['hf_sentiment_classifier'](text)
+    sentiment_guardrail = evaluator.hf_sentiment_classifier(text)
     
     return hate_speech_guardrail and sentiment_guardrail
 
@@ -24,7 +24,7 @@ async def tweet(prompt, i):
     print(f'\nTweet {i+1}:\n\n', new_message.content, '\n\n')
     
     print('\n\nTweet character count:', len(new_message.content), tweet_char_count(new_message.content))
-    # print('\n\nCompound guardrail:', compound_guardrail(new_message.content))
+    print('\n\nCompound guardrail:', compound_guardrail(new_message.content))
     # print('\n\nTweet Judge:', await evaluator['tweet_judge'](new_message.content))
 
 

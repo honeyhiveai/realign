@@ -38,7 +38,7 @@ class TweetBot(Simulation):
     async def windup(self):
         await super().windup()
         
-        elo_ratings = await aevaluator['llm_tweet_choice_judge'](self.final_states)
+        elo_ratings = await aevaluator.llm_tweet_choice_judge(self.final_states)
         
         # print the best and worst tweets
         print('-'*100)

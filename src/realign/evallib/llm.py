@@ -2,7 +2,7 @@ import numpy as np
 import itertools
 
 from realign.evaluators import aevaluator, evaluator
-from realign.llm_utils import allm_messages_call, AgentSettings
+from realign.llm_utils import allm_messages_call, llm_messages_call, AgentSettings
 from realign.utils import run_async
 
 
@@ -32,6 +32,15 @@ async def allm_rating_json(messages=None,
         agent_settings=agent_settings,
     )
     
+    return message.content
+
+@evaluator
+def llm_rating_json(messages=None, criteria=None, agent_settings=None):
+    message = llm_messages_call(
+        template="rating_5_star",
+        template_params={"messages": messages, "criteria": criteria},
+        agent_settings=agent_settings,
+    )
     return message.content
 
 @aevaluator

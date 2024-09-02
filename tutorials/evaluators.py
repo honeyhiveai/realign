@@ -64,3 +64,5 @@ print(config['evaluators']['tweet_char_count']) # config
 # you can also access default config dict using config.default
 print(config.default['evaluators']['elo_ratings']) # config
 
+# you can also call default evaluators directly
+print(evaluator.llm_rating_json('hello'))
