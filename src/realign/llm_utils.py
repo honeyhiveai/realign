@@ -5,15 +5,18 @@ from dataclasses import dataclass, fields
 from typing import Any, Optional, Callable, Union, Coroutine
 import hashlib
 import yaml
+import time
 
 
 from jinja2 import Template
 
 from litellm import ModelResponse, aembedding, acompletion, validate_environment
+from litellm.types.utils import Choices
 import litellm
 
 from realign.router import Router
-from realign.utils import bcolors, run_async
+from realign.utils import bcolors, run_async, dotdict
+from realign.evaluators import evaluator, aevaluator
 
 
 # this flag helps litellm modify params to ensure that model-specific requirements are met
@@ -29,17 +32,34 @@ router = Router()
 class OpenAIMessage:
     role: str
     content: str | dict[str, str]
+    name: Optional[str] = None
+    tool_call_id: Optional[str] = None
 
     def __getitem__(self, key: str):
         if key == 'role':
             return self.role
         elif key == 'content':
             return self.content
+        elif key == 'tool_call_id':
+            return self.tool_call_id
+        elif key == 'name':
+            return self.name
         else:
             raise KeyError(key)
 
     def __dict__(self):
-        return {"role": str(self.role), "content": str(self.content)}
+        if self.name is None and self.tool_call_id is None:
+            return {
+                "role": str(self.role),
+                "content": str(self.content)
+            }
+        else:
+            return {
+                "role": str(self.role),
+                "content": str(self.content),
+                "name": str(self.name),
+                "tool_call_id": str(self.tool_call_id)
+            }
 
     def __eq__(self, other):
         if isinstance(other, dict):
@@ -116,6 +136,9 @@ class AgentSettings:
 
     # json_mode for the response format
     json_mode: Optional[bool] = False
+    
+    # tools
+    tools: Optional[list[dict | str]] = None
 
     # user or assistant
     role: str = "assistant"
@@ -129,15 +152,13 @@ class AgentSettings:
             return {"type": "json_object"}
         return None
 
-    def resolve_system_prompt(self) -> str:
+    def resolve_system_prompt(self) -> str | None:
         prompt_to_render = ""
         system_prompt = self.system_prompt
         template = self.template
         if system_prompt is None:
             if template is None:
-                raise ValueError(
-                    "Either system_prompt or template must be provided in the model settings"
-                )
+                return None
             else:
                 prompt_to_render = self.resolve_prompt_template(template)
         else:
@@ -178,6 +199,24 @@ class AgentSettings:
             # return the template if exception
             return template_name_or_template
 
+    def resolve_tools(self) -> Optional[list[dict]]:
+        if self.tools is None:
+            return None
+        
+        resolved_tools = []
+        for tool in self.tools:
+            if isinstance(tool, str):
+                assert tool in all_agent_tools, \
+                    f"Tool {tool} not found in any of the configs. Please include it in the config file under 'tools'."
+                
+                resolved_tools.append(all_agent_tools[tool])
+            elif isinstance(tool, dict):
+                resolved_tools.append(tool)
+            else:
+                raise ValueError(f"Invalid tool type. Expected str or dict, got {type(tool)}")
+        
+        return resolved_tools
+
     def validate_keys(self):
         # validate that the API keys are set
         model_key_validation = validate_environment(self.model)
@@ -195,6 +234,7 @@ class AgentSettings:
             hyperparams=self.hyperparams,
             template_params=self.template_params,
             template=self.template,
+            tools=self.tools,
             system_prompt=self.system_prompt,
             json_mode=self.json_mode,
             role=self.role,
@@ -227,7 +267,7 @@ class AgentSettings:
 
 # holds the config for agents
 all_agent_settings: dict[str, AgentSettings] = dict()
-
+all_agent_tools: dict[str, list[dict]] = dict()
 
 def print_system_prompt(prompt, role='assistant'):
     print(system_prompt_str(AgentSettings(system_prompt=prompt, role=role, model='')))
@@ -349,8 +389,14 @@ def llm_call_resolve_agent_settings(
 
     # Apply any additional kwargs
     for key, value in agent_settings_kwargs.items():
-        setattr(agent_settings_to_use, key, value)
-
+        # if the value and attribute are both dicts, merge them
+        if hasattr(agent_settings_to_use, key) and \
+            isinstance(value, dict) and \
+            isinstance(getattr(agent_settings_to_use, key), dict):
+            getattr(agent_settings_to_use, key).update(value)
+        else:
+            setattr(agent_settings_to_use, key, value)
+    
     assert isinstance(
         agent_settings_to_use, AgentSettings
     ), f"agent_settings_to_use type {type(agent_settings_to_use)} is invalid"
@@ -374,14 +420,15 @@ def llm_call_get_completion_params(
     agent_settings.validate_keys()
 
     # insert / prepend / replace the system prompt
-    if len(messages) == 0:
-        messages = [OpenAIMessage(role="system", content=system_prompt)]
-    elif messages[0].role != "system":
-        messages.insert(0, OpenAIMessage(role="system", content=system_prompt))
-    else:
-        messages[0].content = system_prompt
-        
-    assert len(messages) > 0 and messages[0].role == "system", 'could not initialize messages'
+    if system_prompt is not None:
+        if len(messages) == 0:
+            messages = [OpenAIMessage(role="system", content=system_prompt)]
+        elif messages[0].role != "system":
+            messages.insert(0, OpenAIMessage(role="system", content=system_prompt))
+        else:
+            messages[0].content = system_prompt
+            
+    assert len(messages) > 0, 'could not initialize messages'
         
     # add the init_messages only once at the beginning
     if agent_settings.init_messages:
@@ -409,6 +456,9 @@ def llm_call_get_completion_params(
     # resolve hyperparams
     hyperparams = agent_settings.hyperparams or dict()
 
+    # resolve tools
+    tools = agent_settings.resolve_tools()
+
     # resolve api_key
     api_key = None
     if agent_settings.api_key:
@@ -421,6 +471,7 @@ def llm_call_get_completion_params(
         "model": agent_settings.model,
         "api_key": api_key,
         "messages": messages_to_llm,
+        "tools": tools,
         "response_format": response_format,
         **hyperparams,
     }
@@ -448,32 +499,183 @@ def llm_call_post_process_response(
         else:
             return OpenAIMessage(role="assistant", content="error")
 
-    raw_message = response.choices[0].message
-    response_messages_role = agent_settings.role or raw_message["role"]
-    response_message = OpenAIMessage(
-        role=response_messages_role, content=raw_message["content"]
-    )
+    # process the response
+    response_choice = response.choices[0]
+    if response_choice.finish_reason == 'stop':
+        raw_message = response_choice.message
+        response_messages_role = agent_settings.role or raw_message["role"]
+        response_message = OpenAIMessage(
+            role=response_messages_role, content=raw_message.content
+        )
+        
+        if agent_settings.json_mode:
+            response_message.content = json.loads(response_message.content)
 
-    if agent_settings.json_mode:
-        response_message.content = json.loads(response_message.content)
+    else:
+        raise ValueError(f'Invalid finish reason: {response_choice.finish_reason}')
 
     return response_message
 
-def get_or_create_eventloop():
-    try:
-        return asyncio.get_event_loop()
-    except RuntimeError as ex:
-        if "There is no current event loop in thread" in str(ex):
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            return loop
-        raise
+async def allm_tool_call(
+    response: ModelResponse,
+    tool_funcs: list[Callable],
+) -> Optional[list[OpenAIMessage]]:
+    
+    response_choice: list[Choices] = response.choices[0]
+    
+    if response_choice.finish_reason != 'tool_calls' or response_choice.message.tool_calls is None:
+        return None
+    
+    tool_func_map = dict()
+    if tool_funcs is not None:
+        for tool_func in tool_funcs:
+            assert isinstance(tool_func, Callable), f"Tool function {tool_func} is not callable"
+            assert tool_func.__name__ is not None, f"Tool function {tool_func} has no name"
+            tool_func_map[tool_func.__name__] = tool_func
+            
+    def is_coroutine(func: Callable) -> bool:
+        return asyncio.iscoroutinefunction(func) or \
+            isinstance(func, aevaluator)
+        
+    async def execute_tool_call(tool_call):
+        assert "id" in tool_call, "Tool call id not found"
+        assert "function" in tool_call, "Tool call function not found"
+        assert tool_call.function.name is not None, "Tool call function name not found"
+        assert tool_call.function.arguments is not None, "Tool call arguments not found"
+        function_name = tool_call.function.name
+        
+        # parse the arguments
+        try:
+            function_args = json.loads(tool_call.function.arguments)
+        except Exception as e:
+            print(f'Error parsing tool call arguments for {function_name}: {e}')
+            response_content = f'Error parsing tool call arguments for {function_name}: {e}'
+            return OpenAIMessage(
+                role='tool',
+                name=function_name,
+                tool_call_id=tool_call.id,
+                content=response_content
+            )
+        
+        # call the tool
+        try:
+            response_content = None
+            start_time = asyncio.get_event_loop().time()
+            
+            if function_name in evaluator.all_evaluators:
+                if is_coroutine(evaluator[function_name]):
+                    function_response = await evaluator[function_name](**function_args)
+                else:
+                    function_response = await asyncio.to_thread(evaluator[function_name], **function_args)
+            elif function_name in tool_func_map:
+                if is_coroutine(tool_func_map[function_name]):
+                    function_response = await tool_func_map[function_name](**function_args)
+                else:
+                    function_response = await asyncio.to_thread(tool_func_map[function_name], **function_args)
+            else:
+                raise ValueError(f"Function {function_name} implementation not found in tool_funcs or evaluator")
+            
+            end_time = asyncio.get_event_loop().time()
+            
+            # append the tool call to the messages
+            print('Successfully called tool', function_name, f'in {end_time - start_time:.3f} seconds.')
+            response_content = str(function_response)
+        
+        except Exception as e:
+            print(f'Error calling tool {function_name}: {e}')
+            response_content = f'Error calling tool {function_name}: {e}. Do not retry.'
+            
+        finally:
+            if response_content is None:
+                response_content = f'Could not call tool {function_name}. Do not retry.'
+            
+            return OpenAIMessage(
+                role='tool',
+                name=function_name,
+                tool_call_id=tool_call.id,
+                content=response_content
+            )
+    
+    # execute all the tool calls in parallel
+    response_messages = await asyncio.gather(
+        *[
+            execute_tool_call(tool_call) 
+            for tool_call in response_choice.message.tool_calls
+        ]
+    )
+
+    return response_messages
+
+def llm_tool_call(
+    response: ModelResponse,
+    tool_funcs: list[Callable],
+) -> Optional[list[OpenAIMessage]]:
+    
+    response_choice = response.choices[0]
+    
+    if response_choice.finish_reason != 'tool_calls' or response_choice.message.tool_calls is None:
+        return None
+    
+    tool_func_map = dict()
+    if tool_funcs is not None:
+        for tool_func in tool_funcs:
+            assert isinstance(tool_func, Callable), f"Tool function {tool_func} is not callable"
+            assert tool_func.__name__ is not None, f"Tool function {tool_func} has no name"
+            tool_func_map[tool_func.__name__] = tool_func
+        
+    response_messages = []
+    
+    for tool_call in response_choice.message.tool_calls:
+        assert "id" in tool_call, "Tool call id not found"
+        assert "function" in tool_call, "Tool call function not found"
+        assert tool_call.function.name is not None, "Tool call function name not found"
+        assert tool_call.function.arguments is not None, "Tool call arguments not found"
+        function_name = tool_call.function.name
+        
+        try:
+            function_args = json.loads(tool_call.function.arguments)
+            
+            # call the tool
+            start_time = time.time()
+            
+            if function_name in evaluator.all_evaluators:
+                assert not asyncio.iscoroutine(evaluator[function_name]), f"Tool function {function_name} is a coroutine"
+                function_response = evaluator[function_name](**function_args)
+            elif function_name in tool_func_map:
+                assert not asyncio.iscoroutine(tool_func_map[function_name]), f"Tool function {function_name} is a coroutine"
+                function_response = tool_func_map[function_name](**function_args)
+            else:
+                raise ValueError(f"Function {function_name} implementation not found in tool_funcs or evaluator")
+            
+            end_time = time.time()
+            
+            # append the tool call to the messages
+            response_messages.append(OpenAIMessage(
+                role='tool',
+                name=function_name,
+                tool_call_id=tool_call.id,
+                content=function_response
+            ))
+            print('Successfully called tool', function_name, f'in {end_time - start_time:.3f} seconds.')
+            
+        except Exception as e:
+            print(f'Error calling tool {function_name}: {e}')
+            
+            response_messages.append(OpenAIMessage(
+                role='tool',
+                name=function_name,
+                tool_call_id=tool_call.id,
+                content=f'Error calling tool {function_name}: {e}. Do not retry.'
+            ))
+    
+    return response_messages
 
 def llm_messages_call(
     agent_settings_or_name: Optional[Union[AgentSettings, dict, str]] = None,
     agent_settings: Optional[Union[AgentSettings, dict]] = None,
     agent_name: Optional[str] = None,
     messages: list[OpenAIMessage] | list[dict[str, str]] = [],
+    tool_funcs: Optional[list[Callable]] = None,
     **agent_settings_kwargs,
 ) -> OpenAIMessage:
     
@@ -490,7 +692,26 @@ def llm_messages_call(
 
     # call the LLM using the router
     response: ModelResponse = router.completion(**params)
-
+    
+    # keep calling the LLM until the tool calls are resolved
+    while response.choices[0].finish_reason == 'tool_calls' and \
+        response.choices[0].message.tool_calls:
+        
+        # append the tool call message
+        if response.choices[0].finish_reason == 'tool_calls':
+            params['messages'].append(response.choices[0].message)
+        
+        # call the tool
+        messages: Optional[list[OpenAIMessage]] = llm_tool_call(response, tool_funcs)
+        if messages is None or len(messages) == 0:
+            break
+        
+        # append the tool call responses
+        params['messages'].extend([m.__dict__() for m in messages])
+        
+        # call the LLM again
+        response: ModelResponse = router.completion(**params)
+    
     # post process the response
     message: OpenAIMessage = llm_call_post_process_response(
         agent_settings, messages, response
@@ -501,9 +722,10 @@ def llm_messages_call(
 
 async def allm_messages_call(
     agent_settings_or_name: Optional[Union[AgentSettings, dict, str]] = None,
+    messages: list[OpenAIMessage] | list[dict[str, str]] = [],
     agent_settings: Optional[Union[AgentSettings, dict]] = None,
     agent_name: Optional[str] = None,
-    messages: list[OpenAIMessage] | list[dict[str, str]] = [],
+    tool_funcs: Optional[list[Callable]] = None,
     **agent_settings_kwargs,
 ) -> OpenAIMessage:
     """Make an LLM call with provided agent_settings and messages"""
@@ -521,7 +743,26 @@ async def allm_messages_call(
 
     # call the LLM using the router
     response: ModelResponse = await router.acompletion(**params)
-
+    
+    # keep calling the LLM until the tool calls are resolved
+    while response.choices[0].finish_reason == 'tool_calls' and \
+        response.choices[0].message.tool_calls:
+        
+        # append the tool call message
+        if response.choices[0].finish_reason == 'tool_calls':
+            params['messages'].append(response.choices[0].message)
+        
+        # call the tool
+        messages: Optional[list[OpenAIMessage]] = await allm_tool_call(response, tool_funcs)
+        if messages is None or len(messages) == 0:
+            break
+        
+        # append the tool call responses to the messages
+        params['messages'].extend([m.__dict__() for m in messages])
+        
+        # call the LLM again
+        response: ModelResponse = await router.acompletion(**params)
+        
     # post process the response
     message: OpenAIMessage = llm_call_post_process_response(
         agent_settings, messages, response

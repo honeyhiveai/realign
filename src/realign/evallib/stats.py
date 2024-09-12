@@ -2,6 +2,13 @@ import math
 
 from realign.evaluators import evaluator, EvalResult
 from realign.utils import try_import
+
+
+# return multiple values
+# return 1 object with multiple values in it
+
+# return evaluator value
+
 @evaluator
 def weighted_sum(values, results: list[EvalResult]):
     

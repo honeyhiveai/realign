@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "realign"
 version = "0.1.38"
 dependencies = [
-    "honeyhive",
+    "honeyhive==0.2.9",
     "litellm",
     "jinja2",
     "python-dotenv",
@@ -19,7 +19,7 @@ authors = [
     {name = "HoneyHive", email = "support@honeyhive.ai"},
 ]
 license = {text = "MIT License"}
-requires-python = ">= 3.8"
+requires-python = ">= 3.9"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",

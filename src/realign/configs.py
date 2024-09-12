@@ -6,7 +6,7 @@ import inspect
 import warnings
 
 from .evaluators import evaluator, EvalSettings, EvaluatorSettings
-from .llm_utils import all_agent_settings, AgentSettings
+from .llm_utils import all_agent_settings, all_agent_tools, AgentSettings
 from .utils import bcolors, dotdict
 
 
@@ -118,7 +118,8 @@ class Config:
         # initialize the evaluators and llm agents
         Config.initialize_evaluators(resolved_yaml_content, resolved_path)
         Config.initialize_llm_agents(resolved_yaml_content, resolved_path)
-
+        Config.initialize_tools(resolved_yaml_content, resolved_path)
+        
     def __get__(self, obj, objtype):
         if len(Config.config_paths) == 0:
             raise ValueError("No config file loaded.")
@@ -171,6 +172,21 @@ class Config:
             else:
                 all_agent_settings[name].update(AgentSettings(**raw_settings))
 
+    @staticmethod
+    def initialize_tools(config_contents: dict, config_path: str | None = None):
+        assert isinstance(config_contents, dict), f"Invalid YAML structure: {config_contents}"
+        
+        if "tools" not in config_contents:
+            return
+        
+        assert isinstance(
+            config_contents["tools"], dict
+        ), "tools must be a dictionary"
+        
+        for name, raw_settings in config_contents["tools"].items():
+            all_agent_tools[name] = raw_settings
+                
+        
 class ConfigPath:
     yaml = path = Config()
     

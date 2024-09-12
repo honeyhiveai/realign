@@ -34,6 +34,7 @@ llm = import_module('realign.evallib.llm')
 nlp = import_module('realign.evallib.nlp')
 rag = import_module('realign.evallib.rag')
 py = import_module('realign.evallib.py')
+serp = import_module('realign.evallib.serp')
 
 # ------------------------------------------------------------------------------
 # LOAD ALL EVALUATORS 

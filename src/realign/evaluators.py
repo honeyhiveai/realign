@@ -697,7 +697,11 @@ class evaluator(metaclass=EvaluatorMeta):
             final_settings
         )
 
-        checker_score = await evaluator.aresolve_pipeline(checker_score, eval_score, final_settings.target)
+        checker_score = await evaluator.aresolve_pipeline(
+            checker_score, 
+            eval_score, 
+            final_settings.target
+        )
 
         checker_result = self.post_run_checker(
             eval_result, 

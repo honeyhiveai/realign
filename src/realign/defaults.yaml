@@ -1,3 +1,74 @@
+tools:
+  get_current_weather:
+    type: function
+    function:
+      name: get_current_weather
+      description: Get the current weather in a given location
+      parameters:
+        type: object
+        properties:
+          location:
+            type: string
+            description: The city and state, e.g. San Francisco, CA
+          unit:
+            type: string
+            enum: [celsius, fahrenheit]
+        required: [location, unit]
+
+  google_flights:
+    type: function
+    function:
+      name: google_flights
+      description: Get flights from one airport to another
+      parameters:
+        type: object
+        properties:
+          departure_id:
+            type: string
+            description: The departure airport IATA code
+          arrival_id:
+            type: string
+            description: The arrival airport IATA code
+          outbound_date:
+            type: string
+            description: The outbound date in YYYY-MM-DD format
+          return_date:
+            type: string
+            description: The return date in YYYY-MM-DD format
+        required: [departure_id, arrival_id, outbound_date, return_date]
+  
+  google_search:
+    type: function
+    function:
+      name: google_search
+      description: Search the web using Google search
+      parameters:
+        type: object
+        properties:
+          q:
+            type: string
+            description: The search query
+        required: [q]
+
+  get_website_text:
+    type: function
+    function:
+      name: get_website_text
+      description: Get the text of a given website URL
+      parameters:
+        type: object
+        properties:
+          url:
+            type: string
+            description: The URL of the website
+        required: [url]
+
+  
+  current_date:
+    type: function
+    function:
+      name: current_date
+      description: Get the current date in YYYY-MM-DD        
 
 llm_agents:
   default: &basic_agent_settings
@@ -15,6 +86,13 @@ llm_agents:
   explanation_summary_agent: &explanation_summary_agent
     model: openai/gpt-4o-mini
     template: explanation_summary
+    json_mode: on
+    hyperparams:
+      temperature: 0
+
+  summary_agent: &summary_agent
+    model: openai/gpt-4o-mini
+    template: summary
     json_mode: on
     hyperparams:
       temperature: 0

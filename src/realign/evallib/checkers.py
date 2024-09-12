@@ -1,15 +1,17 @@
 from realign.evaluators import evaluator
 
 @evaluator
-def numrange(x, target=None):
+def numrange(x, range=None):
     '''Evaluator for checking if a numeric value is within a passing range'''
     
-    assert x, 'numrange requires an argument'
+    assert x is not None, 'numrange requires an argument'
     
-    if not target:
+    print('Range:', range)
+    
+    if not range:
         return True
     
-    num_range = target
+    num_range = range
     
     if num_range is None:
         return True
@@ -75,7 +77,7 @@ def numrange(x, target=None):
                 else:
                     return left < x
             else:
-                assert left <= right, f'invalid target range {str_interval}'
+                assert left <= right, f'invalid range {str_interval}'
                 if left_inclusive and right_inclusive:
                     return left <= x <= right
                 elif left_inclusive and not right_inclusive:

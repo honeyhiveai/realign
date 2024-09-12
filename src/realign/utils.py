@@ -49,7 +49,10 @@ async def arun_callables(funcs: list[Callable],
 
 
 
-def run_async(tasks: list[Coroutine] | Coroutine) -> Any | Coroutine:
+def run_async(
+    tasks: list[Coroutine] | Coroutine,
+    times: int | None = None
+) -> Any | Coroutine:
     
     # run the tasks in parallel
     async def gather_async(*tasks):
@@ -61,12 +64,21 @@ def run_async(tasks: list[Coroutine] | Coroutine) -> Any | Coroutine:
         else:
             return task
     
+    async def run_multiple_times(coro, times):
+        return await asyncio.gather(*[
+            coro
+            for _ in range(times)
+        ])
+    
     if not isinstance(tasks, (list, tuple)):
         coroutine = single_task(tasks)
     else:
         coroutine = gather_async(*tasks)
-        
-    # if we are in a running event loop, return coroutine
+    
+    if times is not None:
+        coroutine = run_multiple_times(coroutine, times)
+    
+    # if we are in a running event loop, return coroutine to be awaited
     if asyncio.get_event_loop().is_running():
         return coroutine
     

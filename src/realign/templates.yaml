@@ -62,7 +62,7 @@ summary: |
 
     [The Start of Input]
 
-    {{messages}}
+    {{content}}
 
     [The End of Input]
 
@@ -84,3 +84,64 @@ synthetic_user_prompt_generator: |
     Command your Synthetic User Agent in instruction format, starting with: 'Pretend that you are {{persona}}. You are intelligent, curt, and direct human. Talk strictly in conversation format. Extremely important: ALL your responses should be ONE sentence only and no more. Start by introducing yourself and stating what you'd like to do.' followed by detailed instructions on how to proceed with the scenario. 
 
     Respond ONLY with your generated prompt in the following JSON format: {'synth_user_system_prompt': GENERATED_USER_PROMPT}, for example {'synth_user_system_prompt': 'Pretend that you are...'}.
+
+chain_of_thought_agent: |
+    [Instruction]
+
+    You are designed to help with a variety of tasks, from answering questions to providing summaries to other types of analyses.
+
+    You have access to a wide variety of tools. You are responsible for using the tools in any sequence you deem appropriate to complete the task at hand. This may require breaking the task into subtasks and using different tools to complete each subtask.
+
+    Please answer in the same language as the question and use the following format:
+
+    Thought: I need to use a tool to help me answer the question.
+    Action: tool name if using a tool.
+    Action Input: the input to the tool, in a JSON format representing the kwargs (e.g. {"input": "hello world", "num_beams": 5})
+    ```
+
+    Please ALWAYS start with a Thought.
+
+    NEVER surround your response with markdown code markers. You may use code markers within your response if you need to.
+
+    Please use a valid JSON format for the Action Input. Do NOT do this {'input': 'hello world', 'num_beams': 5}.
+
+    If this format is used, the user will respond in the following format:
+
+    ```
+    Observation: tool response
+    ```
+
+    You should keep repeating the above format till you have enough information to answer the question without using any more tools.
+
+    Now, start by helping the user with the following task:
+
+    {{task}}
+
+
+completion_criteria_checker: |
+    [Objective]
+
+    As an LLM judge, your task is to determine whether the given content meets or does not meet given user-defined completion criteria.
+
+    Respond strictly in JSON format, returning the completion status and explanation of each criteria, like this:
+    '{"<criteria>": {"explanation": "<explanation>", "score": true}, ... other criteria listed below }
+
+    The score is true if the content meets the criteria, and false if the content does not meet the criteria. Don't overthink it.
+
+    In your explanation, be brief and explain your reasoning objectively as to why the score is true or false.
+    
+    [Criteria]
+    Evaluate whether or not the below content meets this list of criteria:
+
+    {% for criterion in criteria %}
+    - {{ criterion }}: {{ criteria[criterion] }}
+    {% endfor %}
+
+    [Content]
+    Based on the above criteria, determine whether the content below meets the criteria:
+
+    {{ content }}
+
+    Make sure you include ALL the criteria in your response.
+
+    [JSON Response]

@@ -2,7 +2,7 @@ import numpy as np
 import itertools
 
 from realign.evaluators import aevaluator, evaluator
-from realign.llm_utils import allm_messages_call, llm_messages_call, AgentSettings
+from realign.llm_utils import allm_messages_call, llm_messages_call, AgentSettings, all_agent_settings
 from realign.utils import run_async
 
 
@@ -176,3 +176,14 @@ async def allm_rating_json_aggregate(values: tuple[dict[str, str]]):
         "explanation_summary": str(explanation_summary.content),
         "raw_ratings": list(ratings),
     }
+
+@aevaluator
+async def allm_judge(agent_name: str = None, **kwargs):
+    """
+    Judge a set of values using an LLM.
+    """
+    message = await allm_messages_call(
+        agent_name=agent_name,
+        **kwargs
+    )
+    return message.content
