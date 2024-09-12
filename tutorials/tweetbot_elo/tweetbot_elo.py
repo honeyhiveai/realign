@@ -49,4 +49,4 @@ class TweetBot(Simulation):
 
 
 sim = TweetBot('write an insightful tweet based on the abstract of the research paper')
-sim.run(3)
+sim.run(5)
