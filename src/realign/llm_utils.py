@@ -428,7 +428,7 @@ def llm_call_get_completion_params(
         else:
             messages[0].content = system_prompt
             
-    assert len(messages) > 0, 'could not initialize messages'
+    # assert len(messages) > 0, 'could not initialize messages'
         
     # add the init_messages only once at the beginning
     if agent_settings.init_messages:

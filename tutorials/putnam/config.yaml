@@ -1,0 +1,3 @@
+llm_agents:
+  putnam_solver:
+    model: openai/o1-preview

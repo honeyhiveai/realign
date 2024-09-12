@@ -358,7 +358,7 @@ class Router:
             self.model_routers[model] = ModelRouter(model, 
                                                     settings['batch_size'], 
                                                     settings['requests_per_minute'])
-            print(f'Created model router for {model}')
+            print(f'Created model router for {model} with batch_size {settings["batch_size"]} and RPM {settings["requests_per_minute"]}')
     
     async def acompletion(self, **params) -> ModelResponse:
         

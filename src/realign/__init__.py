@@ -5,7 +5,7 @@ from .evaluators import evaluator, aevaluator
 from . import evallib
 
 # load the agents
-from .llm_utils import allm_messages_call, llm_messages_call, run_async
+from .llm_utils import allm_messages_call, llm_messages_call, run_async, router
 
 # load config
 from .configs import config, assume_config, DEFAULT_CONFIG_PATH
@@ -21,13 +21,17 @@ if presumed_config:
 # load the simulation classes
 from .simulation import Simulation, ChatSimulation, Context
 
+from .evaluation import Evaluation
+
 
 __all__ = [
     'configs',
     'config',
+    'router',
     'load_config',
     'evaluator',
     'aevaluator',
+    'Evaluation',
     'llm_messages_call',
     'allm_messages_call',
     'run_async',
