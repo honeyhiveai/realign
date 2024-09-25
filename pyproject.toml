@@ -6,7 +6,6 @@ build-backend = "setuptools.build_meta"
 name = "realign"
 version = "0.1.41"
 dependencies = [
-    "honeyhive==0.2.9",
     "litellm",
     "jinja2",
     "python-dotenv",
