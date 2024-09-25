@@ -22,7 +22,6 @@ from realign.agents import (
 )
 from realign.evaluators import evaluator, EvalResult
 from realign.utils import arun_callables, bcolors
-from realign.tracing import get_tracer
 
 @dataclass
 class Context:
@@ -93,13 +92,6 @@ class Simulation:
         # results
         self.run_data: dict[int, RunData] = dict()
         self.eval_results: dict[int, list[EvalResult]] = dict()
-
-        # tracing
-        self.disable_auto_tracing = False # set this value to True to bypass auto tracing
-        if self.disable_auto_tracing:
-            self.tracer = None
-        else:
-            self.tracer = get_tracer('simulation')
             
     async def _setup(self, *args, **kwargs):
         '''Sets up objects used in the simulation'''
@@ -118,10 +110,7 @@ class Simulation:
     async def setup(self, *args, **kwargs): ...
     
     async def _before_each(self, run_context: Context):
-        # initialize auto tracer
-        if not self.disable_auto_tracing and self.tracer:
-            self.tracer.initialize_trace_for_simulation(run_context)
-                
+        
         result = await self.before_each(run_context)
     
         ### other before_each code
