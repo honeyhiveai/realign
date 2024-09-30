@@ -21,9 +21,6 @@ if presumed_config:
 # load the simulation classes
 from .simulation import Simulation, ChatSimulation, Context
 
-from .evaluation import Evaluation
-
-
 __all__ = [
     'configs',
     'config',
@@ -31,7 +28,6 @@ __all__ = [
     'load_config',
     'evaluator',
     'aevaluator',
-    'Evaluation',
     'llm_messages_call',
     'allm_messages_call',
     'run_async',
