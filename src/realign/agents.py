@@ -286,11 +286,12 @@ class SyntheticUserFactory(AgentBuilder):
             from llama_index.core.storage import StorageContext
             from llama_index.core import Settings
             from llama_index.embeddings.openai import OpenAIEmbedding
+            
+            persist_dir = os.path.join(os.path.dirname(__file__), "persona-hub/cache")
+            personas_path = os.path.join(os.path.dirname(__file__), "persona-hub/persona.jsonl")
+            
         except ImportError:
-            raise ImportError("llama_index not installed")
-        
-        persist_dir = os.path.join(os.path.dirname(__file__), "persona-hub/cache")
-        personas_path = os.path.join(os.path.dirname(__file__), "persona-hub/persona.jsonl")
+            raise ImportError("personas not installed. Please install it with `pip install realign[personas]`")
         
         # use a smaller model for faster embeddings
         # reduce the dimensions to 512

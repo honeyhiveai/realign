@@ -4,12 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "realign"
-version = "0.1.44"
+version = "0.1.47"
 dependencies = [
     "litellm",
     "jinja2",
     "python-dotenv",
-    "llama-index>=0.10.56,<0.11.0",
 ]
 
 description = "Realign is a simulation based evaluation framework for multi-step agents."
@@ -37,6 +36,7 @@ classifiers = [
 
 [project.optional-dependencies]
 dev = ["pylint==2.16.2", "pip-tools>=7.4.1"]
+personas = ["llama-index>=0.10.56,<0.11.0"]
 
 [project.urls]
 Documentation = "https://docs.honeyhive.ai/"
@@ -44,5 +44,6 @@ Documentation = "https://docs.honeyhive.ai/"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+# fix persona-hub data import
 [tool.setuptools.package-data]
-realign = ["**/*.yaml", "persona-hub/*/*"]
+realign = ["**/*.yaml"] 
