@@ -2,7 +2,7 @@
 from .evaluators import evaluator, aevaluator
 
 # instantiate all decorated evaluators in evallib
-from . import evallib
+# from . import evallib
 
 # load the agents
 from .llm_utils import allm_messages_call, llm_messages_call, run_async, router

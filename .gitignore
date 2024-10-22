@@ -14,3 +14,4 @@ data
 .aider*
 .vscode
 NOTES.md
+.venv/

@@ -101,12 +101,12 @@ class Config:
             # resolve and update the yaml contents
             resolved_yaml_content = Config.get_yaml_content(resolved_path)
             
-            print(bcolors.OKBLUE, "Parsed config file:", resolved_path, bcolors.ENDC)
+            # print(bcolors.OKBLUE, "Parsed config file:", resolved_path, bcolors.ENDC)
             
         elif isinstance(path, str):
             resolved_path = inspect.stack()[1].filename
             resolved_yaml_content = load_yaml(path)
-            print(bcolors.OKBLUE, "Parsed config string in file:", os.path.basename(resolved_path), bcolors.ENDC)
+            # print(bcolors.OKBLUE, "Parsed config string in file:", os.path.basename(resolved_path), bcolors.ENDC)
         
         else:
             raise ValueError("Invalid config path. Please specify a file/directory or config string.")
